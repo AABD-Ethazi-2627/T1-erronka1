@@ -1,0 +1,99 @@
+{
+  "encodingVersion": { "majorVersion": 2, "minorVersion": 0 },
+  "externalControllerServices": {},
+  "parameterContexts": {},
+  "flowContents": {
+    "identifier": "cnc-guard-fase1",
+    "name": "CNC Guard — 1. Fasea (INCOMPLETO)",
+    "comments": "IKASLEEK OSATU BEHAR DUTE: ConvertRecord eta PutElasticsearchJson falta dira",
+    "position": { "x": 0.0, "y": 0.0 },
+    "processGroups": [],
+    "remoteProcessGroups": [],
+    "processors": [
+      {
+        "identifier": "consume-kafka-001",
+        "name": "ConsumeKafka",
+        "comments": "Kafka topiko 'cnc-sensors-raw'-tik CSV lerroak kontsumitzen ditu",
+        "position": { "x": 100.0, "y": 200.0 },
+        "type": "org.apache.nifi.processors.kafka.pubsub.ConsumeKafka_2_6",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-kafka-2-6-nar",
+          "version": "1.25.0"
+        },
+        "properties": {
+          "bootstrap.servers": "kafka:9092",
+          "topic": "cnc-sensors-raw",
+          "topic_type": "names",
+          "group.id": "cnc-nifi",
+          "auto.offset.reset": "earliest"
+        },
+        "autoTerminatedRelationships": [],
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "0 sec",
+        "executionNode": "ALL"
+      },
+      {
+        "identifier": "TODO-convert-record-001",
+        "name": "TODO: ConvertRecord — CSV → JSON",
+        "comments": "IKASLEEK GEHITU BEHAR DUTE: CSVReader + JsonRecordSetWriter konfiguratu",
+        "position": { "x": 400.0, "y": 200.0 },
+        "type": "org.apache.nifi.processors.standard.ConvertRecord",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-standard-nar",
+          "version": "1.25.0"
+        },
+        "properties": {
+          "record-reader": "TODO: CSVReader Controller Service sortu",
+          "record-writer": "TODO: JsonRecordSetWriter Controller Service sortu"
+        },
+        "autoTerminatedRelationships": []
+      },
+      {
+        "identifier": "TODO-put-elastic-001",
+        "name": "TODO: PutElasticsearchJson",
+        "comments": "IKASLEEK GEHITU BEHAR DUTE: ElasticSearchClientService eta indizea konfiguratu",
+        "position": { "x": 700.0, "y": 200.0 },
+        "type": "org.apache.nifi.processors.elasticsearch.PutElasticsearchJson",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-elasticsearch-restapi-nar",
+          "version": "1.25.0"
+        },
+        "properties": {
+          "el-rest-client-service": "TODO: ElasticSearchClientService sortu (URL: http://elasticsearch:9200)",
+          "el-rest-fetch-index": "TODO: cnc-sensors",
+          "put-es-record-index-op": "index"
+        },
+        "autoTerminatedRelationships": ["success", "failure", "retry", "failed_documents", "original", "errors"]
+      }
+    ],
+    "connections": [
+      {
+        "identifier": "conn-kafka-convert",
+        "name": "",
+        "source": { "id": "consume-kafka-001", "type": "PROCESSOR" },
+        "destination": { "id": "TODO-convert-record-001", "type": "PROCESSOR" },
+        "selectedRelationships": ["success"]
+      },
+      {
+        "identifier": "conn-convert-elastic",
+        "name": "",
+        "source": { "id": "TODO-convert-record-001", "type": "PROCESSOR" },
+        "destination": { "id": "TODO-put-elastic-001", "type": "PROCESSOR" },
+        "selectedRelationships": ["success"]
+      }
+    ],
+    "labels": [
+      {
+        "identifier": "label-todo",
+        "label": "TODO: ConvertRecord eta PutElasticsearchJson konfiguratu\n- CSVReader Controller Service sortu (Schema: gogoratu CSV-k EZ duela goiburu-lerrorik, Filebeat-ek iragazten du)\n- JsonRecordSetWriter Controller Service sortu\n- ElasticSearchClientService sortu (HTTP Hosts: http://elasticsearch:9200)\n- Indizea: cnc-sensors",
+        "style": { "background-color": "#ffeeaa" },
+        "position": { "x": 300.0, "y": 50.0 },
+        "width": 600.0,
+        "height": 130.0
+      }
+    ]
+  }
+}
