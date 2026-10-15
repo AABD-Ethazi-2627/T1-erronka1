@@ -1,33 +1,14 @@
 # docker-compose.yml — IKASLE VM-ERAKO
 # Simuladorea ZERBITZARI NAGUSIAN dago; honetatik NFS bidez irakurtzen du Filebeat-ek.
-# Abiatzeko: docker compose up -d
+# Abiatzeko: docker compose up -d --build
 
-services:
-
-  # ── Kafka — Mezularitza bufferra (KRaft mode, zookeeper gabe) ────────────────
-  
-  # ── Filebeat — CSV fitxategien irakurlea ─────────────────────────────────────
-
-  # ── Apache NiFi — Transformazioa eta bideratzea ──────────────────────────────
-
-  # ── Elasticsearch — Biltegiratze eta bilaketa ────────────────────────────────
-
-  # ── Kibana — Bistaratzea ─────────────────────────────────────────────────────
-
-  # ── Scoring API — ML inferentzia (3. fasea) ──────────────────────────────────
-  scoring-api:
-    build:
-      context: ./scoring
-    container_name: cnc-scoring
-    ports:
-      - "8000:8000"   # FastAPI (ikasleek probatzeko: http://VM_IP:8000/docs)
-    volumes:
-      - ./models:/models:ro  # Modeloa hemen egon behar da: ./models/cnc_failure_model.pkl
-    environment:
-      MODEL_PATH: /models/cnc_failure_model.pkl
-    restart: unless-stopped
+networks:
+  cnc-net:
+    driver: bridge
 
 volumes:
+  kafka-data:      # Kafka log-en iraunkortasuna
+  nifi-data:       # NiFi flow-en iraunkortasuna
   filebeat-data:   # Filebeat registry (zer fitxategi irakurri den gogoratzeko)
   es-data:         # Elasticsearch datuen iraunkortasuna
   # Windows ekipoetan CIFS bolumena zuzenean erabiltzeko adibidea (Aukera B):
@@ -37,3 +18,134 @@ volumes:
   #     type: cifs
   #     device: "//ZERBITZARI_IP/cnc-stream"
   #     o: "guest"
+
+services:
+
+  # ── Kafka — Mezularitza bufferra (KRaft mode, zookeeper gabe) ────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: cnc-kafka
+    ports:
+      - "29092:29092"   # Host lokaletik sartzeko (Python script-ak: localhost:29092)
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+      # Docker sare barnean: kafka:9092 (Filebeat, NiFi)
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - cnc-net
+
+  # ── Filebeat — CSV fitxategien irakurlea ─────────────────────────────────────
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.10.2
+    container_name: cnc-filebeat
+    user: root
+    command: ["filebeat", "-e", "--strict.perms=false"]
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /mnt/cnc-stream:/mnt/cnc-stream:ro   # Simuladorearen CSV-ak (NFS)
+      - filebeat-data:/usr/share/filebeat/data
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - cnc-net
+
+  # ── Apache NiFi — Transformazioa eta bideratzea ──────────────────────────────
+  nifi:
+    image: apache/nifi:1.23.2
+    container_name: cnc-nifi
+    ports:
+      - "8443:8443"   # HTTPS Web Interfazea
+    environment:
+      NIFI_WEB_HTTPS_PORT: 8443
+      SINGLE_USER_CREDENTIALS_USERNAME: admin
+      SINGLE_USER_CREDENTIALS_PASSWORD: NexoCNC2026SecurePass!
+    volumes:
+      - nifi-data:/opt/nifi/nifi-current/database_repository
+    depends_on:
+      kafka:
+        condition: service_healthy
+      scoring-api:
+        condition: service_started   # /health 3. fasean inplementatzen da
+    restart: unless-stopped
+    networks:
+      - cnc-net
+
+  # ── Elasticsearch — Biltegiratze eta bilaketa ────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    container_name: cnc-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false   # Desaktibatuta tokiko ingurunea errazteko
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - cnc-net
+
+  # ── Kibana — Bistaratzea ─────────────────────────────────────────────────────
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.2
+    container_name: cnc-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - cnc-net
+
+  # ── Scoring API — ML inferentzia (3. fasea) ──────────────────────────────────
+  scoring-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cnc-scoring
+    ports:
+      - "8000:8000"   # FastAPI (ikasleek probatzeko: http://VM_IP:8000/docs)
+    volumes:
+      - ./models:/models:ro  # Modeloa hemen egon behar da: ./models/cnc_failure_model.pkl
+    environment:
+      MODEL_PATH: /models/cnc_failure_model.pkl
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - cnc-net
