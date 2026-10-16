@@ -12,12 +12,12 @@ volumes:
   filebeat-data:   # Filebeat registry (zer fitxategi irakurri den gogoratzeko)
   es-data:         # Elasticsearch datuen iraunkortasuna
   # Windows ekipoetan CIFS bolumena zuzenean erabiltzeko adibidea (Aukera B):
-  # cnc-stream-cifs:
-  #   driver: local
-  #   driver_opts:
-  #     type: cifs
-  #     device: "//ZERBITZARI_IP/cnc-stream"
-  #     o: "guest"
+  cnc-stream-cifs:
+    driver: local
+    driver_opts:
+      type: cifs
+      device: "//192.168.75.150/cnc-stream"
+      o: "username=cncuser,password=cncuser,vers=3.0"
 
 services:
 
