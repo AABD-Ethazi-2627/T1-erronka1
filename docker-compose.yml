@@ -11,13 +11,14 @@ volumes:
   nifi-data:       # NiFi flow-en iraunkortasuna
   filebeat-data:   # Filebeat registry (zer fitxategi irakurri den gogoratzeko)
   es-data:         # Elasticsearch datuen iraunkortasuna
-  # Windows ekipoetan CIFS bolumena zuzenean erabiltzeko adibidea (Aukera B):
+  # Simuladorearen CSV-ak Samba (SMB/CIFS) bidez muntatuta, Filebeat-ek irakurtzeko.
+  # device formatua: //IP/share (ez smb://). addr= beharrezkoa da Docker Desktop-en.
   cnc-stream-cifs:
     driver: local
     driver_opts:
       type: cifs
       device: "//192.168.75.150/cnc-stream"
-      o: "username=cncuser,password=cncuser,vers=3.0"
+      o: "addr=192.168.75.150,username=cncuser,password=cncuser,vers=3.0,ro"
 
 services:
 
@@ -63,7 +64,7 @@ services:
     command: ["filebeat", "-e", "--strict.perms=false"]
     volumes:
       - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-      - /mnt/cnc-stream:/mnt/cnc-stream:ro   # Simuladorearen CSV-ak (NFS)
+      - cnc-stream-cifs:/mnt/cnc-stream:ro   # Simuladorearen CSV-ak (Samba)
       - filebeat-data:/usr/share/filebeat/data
     depends_on:
       kafka:

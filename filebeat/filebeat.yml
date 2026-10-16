@@ -2,7 +2,7 @@
 # CNC Guard — Filebeat Konfigurazioa
 # ═══════════════════════════════════════════════════════════════════
 
-# 1. SARRERA: Simuladorearen CSV fitxategiak (NFS bidez muntatuta)
+# 1. SARRERA: Simuladorearen CSV fitxategiak (Samba/CIFS bidez muntatuta)
 filebeat.inputs:
   - type: filestream
     id: cnc-stream
@@ -13,9 +13,12 @@ filebeat.inputs:
     # Goiburua letraz hasten da (timestamp,...); datu-lerroak data batez (2026-...)
     exclude_lines: ['^[A-Za-z]']
 
-    # NFS-ekin lan egiten ari garenez, fitxategi-jarraipena
-    # path bidez egin behar da (inodo-aldaketak ekiditeko)
+    # Sare-karpeta (CIFS) denez, fitxategi-jarraipena path bidez egin
+    # behar da (inodoak ez dira egonkorrak muntatze berrien artean)
     file_identity.path: ~
+
+    # Fitxategi berriak bilatzeko maiztasuna
+    prospector.scanner.check_interval: 5s
 
 # 2. IRTEERA: Kafka topiko batera — NiFi-k handik kontsumituko ditu.
 # Lerro gordina bidali, ez Beats event JSON osoa (codec.format).
