@@ -141,6 +141,12 @@ services:
       - ./models:/models:ro  # Modeloa hemen egon behar da: ./models/cnc_failure_model.pkl
     environment:
       MODEL_PATH: /models/cnc_failure_model.pkl
+      # Autentifikazioa (JWT). Aldatu balioak edo .env fitxategian definitu.
+      JWT_SECRET: ${JWT_SECRET:-aldatu-hau-cnc-guard-jwt-gako-sekretu-luzea}
+      API_USERNAME: ${API_USERNAME:-nifi}
+      API_PASSWORD: ${API_PASSWORD:-NexoCNC2026ApiPass!}
+      ACCESS_TOKEN_EXPIRE_SECONDS: 300   # access tokena: 5 min
+      REFRESH_TOKEN_EXPIRE_DAYS: 30      # refresh tokena: 30 egun
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 15s
