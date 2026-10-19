@@ -12,6 +12,15 @@ docker exec cnc-filebeat ls /mnt/cnc-stream
 Actualizar contenedores
 ```bash
 docker compose up -d --build scoring-api
+
+Para el nuevo flujo de NiFi
+```
+docker compose down
+docker volume ls | grep t1-erronka1                    # mirar los nombres exactos
+docker volume rm t1-erronka1_cnc-stream-cifs t1-erronka1_filebeat-data
+
+docker compose up -d --build
+docker compose ps        # 6 contenedores "Up"; kafka, elasticsearch y scoring en "healthy"
 ```
 
 ## 2. Zerbitzuak abiarazi
