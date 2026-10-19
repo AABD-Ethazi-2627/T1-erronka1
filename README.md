@@ -21,6 +21,15 @@ docker volume rm t1-erronka1_cnc-stream-cifs t1-erronka1_filebeat-data
 
 docker compose up -d --build
 docker compose ps        # 6 contenedores "Up"; kafka, elasticsearch y scoring en "healthy"
+
+docker compose ps scoring-api
+curl -s localhost:8000/health
+
+docker exec cnc-nifi curl -s -X POST http://scoring-api:8000/auth/token \
+  -d grant_type=password -d username=nifi -d password='NexoCNC2026ApiPass!'
+
+docker logs cnc-nifi 2>&1 | grep -A6 "failed to properly initialize" | grep -iE "caused by|exception" | tail -5
+
 ```
 
 ## 2. Zerbitzuak abiarazi
