@@ -18,8 +18,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY scoring/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Iturburu-kodea kopiatu (eredua ./models-etik bolumen bidez muntatzen da)
-COPY scoring/score_api.py .
+# Iturburu-kodea kopiatu (eredua ./models-etik bolumen bidez muntatzen da).
+# cnc_ml beharrezkoa da: .pkl-ak bere feature engineering funtzioak erreferentziatzen ditu.
+COPY scoring/app ./app
+COPY scoring/cnc_ml ./cnc_ml
 RUN mkdir -p /models
 ENV MODEL_PATH=/models/cnc_failure_model.pkl
 
@@ -27,4 +29,4 @@ ENV MODEL_PATH=/models/cnc_failure_model.pkl
 EXPOSE 8000
 
 # Uvicorn bidez APIa abiarazteko komandoa
-CMD ["uvicorn", "score_api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
