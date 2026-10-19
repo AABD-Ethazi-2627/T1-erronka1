@@ -36,9 +36,21 @@ cnc-guard/
 ├── filebeat/
 │   └── filebeat.yml          ← 1. fasea: ZURE ZEREGINA (osatu — Kafka outputera bideratu)
 ├── scoring/
-│   └── score_api.py          ← 3. fasea: ZURE ZEREGINA (osatu hutsuneak FastAPI-n)
+│   ├── app/                  ← 3. fasea: FastAPI (uvicorn app.main:app)
+│   │   ├── main.py           ←   app + lifespan (eredua abieran kargatu)
+│   │   ├── config.py         ←   ingurune-aldagaiak
+│   │   ├── core/security.py  ←   JWT tokenak (access + refresh)
+│   │   ├── schemas/          ←   Pydantic eskemak (sarrera-balidazioa)
+│   │   ├── services/model.py ←   eredua kargatu, iragarri, alerta-maila
+│   │   └── api/              ←   endpointak: /auth/token, /health, /predict
+│   ├── cnc_ml/               ← notebook-ak ETA API-k partekatzen dute
+│   │   ├── columns.py        ←   zutabeak eta leakage zutabeak
+│   │   ├── features.py       ←   feature engineering
+│   │   └── pipeline.py       ←   sklearn Pipeline (features + kodeketa + eredua)
+│   └── tests/                ← pytest (cd scoring && pytest)
 ├── nifi-flows/
-│   └── cnc_fase1_INCOMPLETO.json  ← 1. fasea: NiFi-n inportatu eta osatu (ConsumeKafka jada konfiguratuta)
+│   ├── cnc_fase1_INCOMPLETO.json  ← 1. fasea: NiFi-n inportatu eta osatu (ConsumeKafka jada konfiguratuta)
+│   └── fase3_streaming.json  ← 3. fasea (NiFi 2.x): ConsumeKafka → ConvertRecord → InvokeHTTP (scoring-api) → PutElasticsearchJson
 ├── notebooks/
 │   └── 02_training_TEMPLATE.ipynb ← 2. fasea: ZURE ZEREGINA (osatu)
 ├── models/                   ← 2. fasea: hemen gorde model.pkl
