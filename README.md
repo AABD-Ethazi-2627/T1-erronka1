@@ -7,8 +7,11 @@ sudo mkdir -p /mnt/cnc-stream
 sudo mount ZERBITZARI_IP:/opt/cnc-stream /mnt/cnc-stream
 ls /mnt/cnc-stream/   # CSV fitxategiak ikusi behar dituzu
 
-Ver archivos docker exec cnc-filebeat ls /mnt/cnc-stream
-
+docker exec cnc-filebeat ls /mnt/cnc-stream
+```
+Actualizar contenedores
+```bash
+docker compose up -d --build scoring-api
 ```
 
 ## 2. Zerbitzuak abiarazi
