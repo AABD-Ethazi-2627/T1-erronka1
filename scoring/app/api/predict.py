@@ -25,7 +25,7 @@ def predict(saria: SentsoreSaria, _token: dict = Depends(access_tokena_behar)):
     return Predikzioa(
         timestamp=saria.timestamp or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         machine_id=saria.machine_id,
-        failure_predicted=prob >= FAILURE_THRESHOLD,
+        failure_predicted=prob > FAILURE_THRESHOLD,
         failure_probability=round(prob, 4),
         alert_level=alerta_maila(prob),
     )

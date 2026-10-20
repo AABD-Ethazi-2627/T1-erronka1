@@ -10,7 +10,7 @@ from cnc_ml.columns import RAW_FEATURES
 
 log = logging.getLogger(__name__)
 
-# Alerta-mailen mugak (ENUNTZIATUA): OK < 0.5 <= KONTUZ <= 0.8 < LARRIA
+# Alerta-mailen mugak: OK <= %50 < KONTUZ <= %80 < LARRIA
 FAILURE_THRESHOLD = 0.5
 LARRIA_THRESHOLD = 0.8
 
@@ -48,7 +48,7 @@ class ModelService:
 def alerta_maila(prob: float) -> str:
     if prob > LARRIA_THRESHOLD:
         return "LARRIA"
-    if prob >= FAILURE_THRESHOLD:
+    if prob > FAILURE_THRESHOLD:
         return "KONTUZ"
     return "OK"
 

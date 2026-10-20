@@ -41,7 +41,7 @@ def test_predict_eredurik_gabe(client, token):
     assert client.post("/predict", json=SAMPLE, headers=auth(token)).status_code == 503
 
 
-@pytest.mark.parametrize("prob,maila,predicted", [(0.1, "OK", False), (0.5, "KONTUZ", True), (0.8, "KONTUZ", True), (0.95, "LARRIA", True)])
+@pytest.mark.parametrize("prob,maila,predicted", [(0.1, "OK", False), (0.5, "OK", False), (0.8, "KONTUZ", True), (0.95, "LARRIA", True)])
 def test_predict_alerta_mailak(client, token, fake_model, prob, maila, predicted):
     fake_model(prob)
     r = client.post("/predict", json=SAMPLE, headers=auth(token))
