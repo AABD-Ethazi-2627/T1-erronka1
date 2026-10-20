@@ -5,3 +5,5 @@ __pycache__/
 *.pyd
 __init__.py
 .vscode/
+models/backups/
+*.pkl.tmp
