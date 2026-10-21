@@ -17,8 +17,8 @@ volumes:
     driver: local
     driver_opts:
       type: cifs
-      device: "//192.168.75.150/cnc-stream"
-      o: "addr=192.168.75.150,username=cncuser,password=cncuser,vers=3.0,ro"
+      device: "//${SMB_IP}/cnc-stream"
+      o: "addr=${SMB_IP},username=${SMB_USERNAME},password=${SMB_PASSWORD:?SMB_PASSWORD falta da .env-n},vers=3.0,ro"
 
 services:
 
@@ -87,8 +87,8 @@ services:
       - "8443:8443"   # HTTPS Web Interfazea
     environment:
       NIFI_WEB_HTTPS_PORT: 8443
-      SINGLE_USER_CREDENTIALS_USERNAME: admin
-      SINGLE_USER_CREDENTIALS_PASSWORD: NexoCNC2026SecurePass!
+      SINGLE_USER_CREDENTIALS_USERNAME: ${NIFI_USERNAME:-admin}
+      SINGLE_USER_CREDENTIALS_PASSWORD: ${NIFI_PASSWORD:?NIFI_PASSWORD falta da .env-n}
     volumes:
       - nifi-data:/opt/nifi/nifi-current/database_repository
     depends_on:
@@ -149,9 +149,9 @@ services:
     environment:
       MODEL_PATH: /models/cnc_failure_model.pkl
       # Autentifikazioa (JWT). Aldatu balioak edo .env fitxategian definitu.
-      JWT_SECRET: ${JWT_SECRET:-aldatu-hau-cnc-guard-jwt-gako-sekretu-luzea}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET falta da .env-n}
       API_USERNAME: ${API_USERNAME:-nifi}
-      API_PASSWORD: ${API_PASSWORD:-NexoCNC2026ApiPass!}
+      API_PASSWORD: ${API_PASSWORD:?API_PASSWORD falta da .env-n}
       ACCESS_TOKEN_EXPIRE_SECONDS: 300   # access tokena: 5 min
       REFRESH_TOKEN_EXPIRE_DAYS: 30      # refresh tokena: 30 egun
     healthcheck:

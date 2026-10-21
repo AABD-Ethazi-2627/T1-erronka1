@@ -69,6 +69,7 @@ cnc-guard/
 ├── nifi-flows/
 │   ├── cnc_fase1_INCOMPLETO.json  ← 1. fasea: NiFi-n inportatu eta osatu (ConsumeKafka jada konfiguratuta)
 │   └── fase3_streaming.json  ← 3. fasea (NiFi 2.x): ConsumeKafka → ConvertRecord → InvokeHTTP (scoring-api) → PutElasticsearchJson
+│   └── CNC_Guard_ _3._Fasea_(Zuzenean_Kibana).json  ← 3. fasea, API gabe: ConsumeKafka → ConvertRecord → PutElasticsearchJson (cnc-sensors indizea)
 ├── notebooks/
 │   └── 02_training_TEMPLATE.ipynb ← 2. fasea: ZURE ZEREGINA (osatu)
 ├── models/                   ← 2. fasea: hemen gorde model.pkl
