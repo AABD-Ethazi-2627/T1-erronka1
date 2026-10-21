@@ -104,6 +104,12 @@ services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
     container_name: cnc-elasticsearch
+    # Hostname finkoa + /etc/hosts-en sarrera: DNS-ak huts egiten badu (VPN, WSL, sare mugatua),
+    # JVM-ak ezin du bere hostname ebatzi eta Elasticsearch-ek abioan huts egiten du
+    # (UnknownHostException). Ez erabili edukiontziaren ID-a: aldatu egiten da birsortzean.
+    hostname: elasticsearch
+    extra_hosts:
+      - "elasticsearch:127.0.0.1"
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false   # Desaktibatuta tokiko ingurunea errazteko
