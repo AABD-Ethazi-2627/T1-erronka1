@@ -16,7 +16,7 @@ Simuladorea (Samba)
 - Docker eta Docker Compose v2 (`docker compose version`)
 - Simuladorearen Samba karpetarako sarbidea (`//SMB_IP/cnc-stream`) — VM-tik irakurgarri
 - ~4 GB RAM libre (Elasticsearch + NiFi + Kafka + Kibana)
-- `models/cnc_failure_model.pkl` fitxategia (repoan dago; berria sortzeko ikus 6. atala)
+- `models/cnc_failure_model.pkl` fitxategia (repoan dago; berria sortzeko ikus 7. atala)
 
 ## 2. Konfigurazioa (`.env`)
 
@@ -65,7 +65,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-6 edukiontzi `Up` egon behar dira; `kafka`, `elasticsearch` eta `scoring-api` `healthy`. NiFi-k ~1-2 minutu behar ditu guztiz abiatzeko.
+7 edukiontzi `Up` egon behar dira; `kafka`, `elasticsearch`, `scoring-api` eta `streamlit` `healthy`. NiFi-k ~1-2 minutu behar ditu guztiz abiatzeko.
 
 | Zerbitzua | URLa | Erabiltzailea / Pasahitza |
 |---|---|---|
@@ -73,6 +73,7 @@ docker compose ps
 | Kibana | http://localhost:5601 | — |
 | Elasticsearch | http://localhost:9200 | — |
 | Scoring API | http://localhost:8000/docs | token bidez (ikus 4. atala) |
+| Streamlit | http://localhost:8501 | — |
 | Kafka | `kafka:9092` (Docker barnetik), `localhost:29092` (host-etik) | — |
 
 ### Egiaztapenak
@@ -126,7 +127,18 @@ curl -s 'localhost:9200/_cat/indices/cnc-*?v'      # docs.count igotzen ari da?
    - Lerroak: X ardatza `timestamp`, Y ardatza `failure_probability` batez bestekoa, banaketa `machine_id.keyword`
    - Taula: `machine_id.keyword`, `alert_level.keyword`, `failure_probability`
 
-## 6. Eredua berriro entrenatu (aukerakoa)
+## 6. Streamlit panela
+
+http://localhost:8501 — `.env`-ko `API_USERNAME` / `API_PASSWORD` erabiltzen ditu APIan autentifikatzeko (ez du ezer gehiago konfiguratu behar).
+
+- **Iragarpen eskuzkoa:** sentsore-balioak sartu eta Scoring API-ari (`/predict`) galdetu. Alerta maila (`OK` / `KONTUZ` / `LARRIA`) eta hutsegite-probabilitatea erakusten ditu.
+- **Monitorizazioa:** `cnc-predictions` indizeko datuak (NiFi-ren *Streaming* flow-ak idazten ditu): alerta mailen kopuruak, probabilitatea denboran, arriskuko makinak eta azken iragarpenak.
+  Indizea oraindik ez badago, mezu bat agertzen da; flow-a abiarazi eta datuak iristean agertuko dira.
+  Datuak hutsik agertzen badira, albo-barrako denbora-tartea `Guztia` jarri (timestamp-a simuladoreak jartzen du).
+
+Kodea aldatu ondoren: `docker compose up -d --build streamlit`.
+
+## 7. Eredua berriro entrenatu (aukerakoa)
 
 Eredua jada `models/cnc_failure_model.pkl`-en dago. Berria sortzeko:
 
@@ -144,7 +156,7 @@ docker compose restart scoring-api
 
 Probak: `cd scoring && pytest`
 
-## 7. Eguneratzeak eta berrabiarazteak
+## 8. Eguneratzeak eta berrabiarazteak
 
 ```bash
 # Kodea edo requirements aldatu da (scoring)
@@ -170,7 +182,7 @@ docker volume rm t1-erronka1_filebeat-data
 docker compose up -d
 ```
 
-## 8. Arazoak konpontzen
+## 9. Arazoak konpontzen
 
 | Sintomak | Zer begiratu |
 |---|---|
@@ -182,7 +194,7 @@ docker compose up -d
 | Kibana-n ez da daturik agertzen | Denbora-tartea, data view-aren denbora-eremua, eta `_cat/indices`-en `docs.count` |
 | API-k 401 itzultzen du NiFi-tik | OAuth2 zerbitzuan pasahitza sartu da eta zerbitzua enabled dago? |
 
-## 9. Proiektuko fitxategiak
+## 10. Proiektuko fitxategiak
 
 ```
 cnc-guard/
@@ -207,6 +219,10 @@ cnc-guard/
 ├── nifi-flows/
 │   ├── CNC_Guard_Streaming.json  ← Kafka → ConvertRecord → InvokeHTTP (scoring-api) → PutElasticsearchJson (cnc-predictions)
 │   └── CNC_Guard_Zuzenean.json   ← Kafka → ConvertRecord → PutElasticsearchJson (cnc-sensors)
+├── streamlit/
+│   ├── app.py                ← panela: eskuzko iragarpena (/predict) + monitorizazioa (Elasticsearch)
+│   ├── requirements.txt
+│   └── Dockerfile
 ├── notebooks/
 │   └── 02_training_ML.ipynb  ← eredua entrenatzeko notebook-a
 ├── models/                   ← cnc_failure_model.pkl
@@ -214,6 +230,6 @@ cnc-guard/
     └── ai4i2020_train.csv    ← entrenamendurako datuak
 ```
 
-## 10. Erronkaren dokumentua
+## 11. Erronkaren dokumentua
 
 `ENUNTZIATUA.md` irakurri — hiru faseetan zer egin azaltzen du.
