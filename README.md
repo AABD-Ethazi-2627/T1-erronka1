@@ -22,18 +22,39 @@ Simuladorea (Samba)
 
 Sekretuak ez daude `docker-compose.yml`-n, `.env` fitxategian baizik (`.gitignore`-n dago, ez da git-era igotzen).
 
+1. Txantiloia kopiatu:
+
 ```bash
 cp .env.example .env
 ```
 
-Bete `.env`:
+2. `JWT_SECRET` sortu eta `.env`-n sartu automatikoki:
 
-| Aldagaia | Zertarako | Oharra |
-|---|---|---|
-| `NIFI_USERNAME` / `NIFI_PASSWORD` | NiFi web UI | Pasahitzak gutxienez 12 karaktere |
-| `JWT_SECRET` | Scoring API-ren JWT sinadura | Sortu: `openssl rand -hex 32` |
-| `API_USERNAME` / `API_PASSWORD` | NiFi-k API-n autentifikatzeko | |
-| `SMB_IP` / `SMB_USERNAME` / `SMB_PASSWORD` | Simuladorearen Samba karpeta | |
+```bash
+sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 32)/" .env
+```
+
+3. Gainerako pasahitzak bete (editorearekin: `nano .env`). Adibidea (aldatu pasahitzak!):
+
+```dotenv
+NIFI_USERNAME=admin
+NIFI_PASSWORD=PasahitzaLuzea2026!      # >= 12 karaktere
+
+JWT_SECRET=<openssl-ek sortutako 64 karaktere>
+API_USERNAME=nifi
+API_PASSWORD=BestePasahitza2026!       # NiFi-ren OAuth2 zerbitzuan ere sartuko duzu (4. atala)
+
+SMB_IP=192.168.75.150                  # simuladorearen zerbitzariaren IPa
+SMB_USERNAME=cncuser
+SMB_PASSWORD=<Samba pasahitza>
+```
+
+| Aldagaia | Zertarako |
+|---|---|
+| `NIFI_USERNAME` / `NIFI_PASSWORD` | NiFi web UI-ra sartzeko. Pasahitzak gutxienez 12 karaktere |
+| `JWT_SECRET` | Scoring API-k JWT tokenak sinatzeko |
+| `API_USERNAME` / `API_PASSWORD` | NiFi-k API-n autentifikatzeko erabiltzen duen kontua |
+| `SMB_IP` / `SMB_USERNAME` / `SMB_PASSWORD` | Simuladorearen Samba karpeta (`//SMB_IP/cnc-stream`) |
 
 Pasahitzak eta `JWT_SECRET` derrigorrezkoak dira: falta bada, `docker compose` errorearekin gelditzen da.
 
