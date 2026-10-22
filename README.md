@@ -184,6 +184,50 @@ docker compose up -d
 
 ## 9. Arazoak konpontzen
 
+### Lehenengo urratsa: logak irakurri
+
+Zerbait huts egiten badu, **lehenik logak irakurri** eta errore-mezua bilatu. Gehienetan mezuak berak esaten du zer dagoen gaizki.
+
+```bash
+# Zein zerbitzu dabiltza? (Restarting / Exited / unhealthy = arazoa)
+docker compose ps
+
+# Zerbitzu baten azken logak
+docker logs cnc-<izena> --tail 100
+
+# Denbora errealean jarraitu (Ctrl+C irteteko)
+docker logs cnc-<izena> -f
+
+# Errore-lerroak soilik iragazi
+docker logs cnc-<izena> 2>&1 | grep -iE "error|exception|failed|caused by"
+
+# Zerbitzu guztien logak batera
+docker compose logs --tail 50
+```
+
+| Edukiontzia | Zer egiten du | Log-komandoa | Zer bilatu |
+|---|---|---|---|
+| `cnc-kafka` | Mezularitza | `docker logs cnc-kafka --tail 100` | `ERROR`, `Exception`, kontrolatzailea ez abiatzea |
+| `cnc-filebeat` | CSV → Kafka | `docker logs cnc-filebeat --tail 100` | `ERROR`, `Failed to connect`, `no such file`; `docker exec cnc-filebeat ls /mnt/cnc-stream` |
+| `cnc-nifi` | Fluxuak | `docker logs cnc-nifi --tail 100` | `failed to properly initialize`, `Caused by` (NiFi astiro abiatzen da: itxaron 1-2 min) |
+| `cnc-elasticsearch` | Biltegiratzea | `docker logs cnc-elasticsearch --tail 100` | `UnknownHostException`, `OutOfMemory`, `max virtual memory`, `disk watermark` |
+| `cnc-kibana` | Bistaratzea | `docker logs cnc-kibana --tail 100` | `Unable to connect to Elasticsearch`, `500` |
+| `cnc-scoring` | ML API | `docker logs cnc-scoring --tail 100` | `Traceback`, modeloa ez da aurkitu (`./models/cnc_failure_model.pkl`), `JWT_SECRET` |
+| `cnc-streamlit` | Panela | `docker logs cnc-streamlit --tail 100` | `Traceback`, `ConnectionError` (scoring-api edo Elasticsearch erortuta) |
+
+### Errore ohikoenak
+
+- **`500 Internal Server Error`**: erantzuna ematen duen zerbitzuak huts egin du, ez bezeroak. Begiratu zein URLri dagokion eta zerbitzu horren logak (adib. `:5601` → `cnc-kibana`, `:9200` → `cnc-elasticsearch`, `:8000` → `cnc-scoring`). Filebeat-ek ez du Elasticsearch-ekin hitz egiten (Kafka-ra bidaltzen du), beraz 500 bat ez da Filebeat-etik datorrena.
+- **`401 Unauthorized`**: tokena iraungita edo `.env`-ko `API_USERNAME` / `API_PASSWORD` gaizki daude.
+- **Zerbitzua `Restarting` dago**: `docker logs` begiratu; edukiontzia berrabiarazten ari da abioan huts egiten duelako.
+- **`unhealthy`**: `docker inspect cnc-<izena> --format '{{json .State.Health}}'` komandoak azken healthcheck-aren irteera erakusten du.
+- **Diskoa beteta**: `df -h` eta `docker system df`. Elasticsearch-ek idazketak blokeatzen ditu diskoa beteta dagoenean.
+- **Konfigurazioa aldatu ondoren ez dabil**: `docker compose up -d <zerbitzua>` (birsortu), ez soilik `restart`.
+
+Irakasleari galdetu aurretik: (1) `docker compose ps`, (2) hutsegiten duen zerbitzuaren logak, (3) errore-lerroa bilatu eta bilatzailean/dokumentazioan begiratu. Galdetzen baduzu, erantsi errore-lerro **zehatza**.
+
+### Sintoma azkarren taula
+
 | Sintomak | Zer begiratu |
 |---|---|
 | `docker compose` errorea: `... falta da .env-n` | `.env` fitxategia sortu duzu? (2. atala) |
