@@ -13,8 +13,22 @@ API_USERNAME = os.getenv("API_USERNAME", "nifi")
 API_PASSWORD = os.getenv("API_PASSWORD", "")
 ES_URL       = os.getenv("ES_URL",       "http://elasticsearch:9200").rstrip("/")
 ES_INDEX     = os.getenv("ES_INDEX",     "cnc-predictions")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 MAILAK   = ["OK", "KONTUZ", "LARRIA"]
+SVG_FACTORY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 21h18v-2H3v2Zm2-4h3V8H5v9Zm5 0h4V3h-4v14Zm6 0h3v-6h-3v6Z"/></svg>'
+SVG_SHIELD = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 4 5v6c0 5.2 3.4 9.8 8 11 4.6-1.2 8-5.8 8-11V5l-8-3Zm-1 14-3-3 1.4-1.4L11 13.2l3.6-3.6L16 11l-5 5Z"/></svg>'
+SVG_ALERT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3 1.8 20h20.4L12 3Zm1 13h-2v-2h2v2Zm0-4h-2V8h2v4Z"/></svg>'
+SVG_CLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 5h-2v6l5 3 1-1.7-4-2.3V7Z"/></svg>'
+
+
+class ElasticsearchUnavailable(Exception):
+    """El servicio de Elasticsearch no responde."""
+
+
+class ElasticsearchIndexMissing(Exception):
+    """El índice configurado todavía no existe."""
 
 st.set_page_config(
     page_title="CNC Guard",
@@ -40,7 +54,7 @@ st.markdown("""
 }
 [data-testid="stHeader"]      { background: transparent !important; }
 [data-testid="stToolbar"]     { display: none !important; }
-.block-container              { max-width: 1500px; padding: 0 1.5rem 1.5rem !important; }
+.block-container              { max-width: 1500px; padding: 0 1rem .5rem !important; }
 
 /* ── Sidebar fija, sin colapsar ── */
 [data-testid="stSidebar"] {
@@ -186,8 +200,8 @@ div[class*="resizeHandle"] { display: none !important; }
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    margin: 0 -1.5rem 1.5rem;
-    padding: 1rem 1.5rem;
+    margin: 0 -1rem .7rem;
+    padding: .65rem 1rem;
     background: rgba(4,10,22,.7);
     border-bottom: 1px solid rgba(255,255,255,.05);
     position: sticky;
@@ -206,6 +220,7 @@ div[class*="resizeHandle"] { display: none !important; }
     color: #2e4d6a !important;
     font-size: .72rem !important;
 }
+.page-header p { display: none !important; }
 .ph-badge {
     font-size: .62rem;
     font-weight: 600;
@@ -249,6 +264,52 @@ div[class*="resizeHandle"] { display: none !important; }
     font-weight: 700 !important;
 }
 
+/* Tarjetas KPI del dashboard */
+.dash-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .7rem;
+    margin-bottom: 1rem;
+}
+.dash-kpi {
+    position: relative;
+    min-width: 0;
+    min-height: 4.35rem;
+    padding: .85rem 1rem .7rem 1.15rem;
+    overflow: hidden;
+    border: 1px solid rgba(77,156,248,.09);
+    border-radius: 5px;
+    background: linear-gradient(135deg, #0a2038, #081a2e);
+    box-shadow: 0 3px 12px rgba(0,0,0,.18);
+    transition: border-color .1s linear, transform .1s linear;
+}
+.dash-kpi::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: #22c55e;
+}
+.dash-kpi:hover {
+    transform: translateY(-2px);
+    border-color: rgba(77,156,248,.35);
+}
+.dash-kpi.alert::before { background: #ef233c; }
+.dash-kpi.blue::before { background: #168cff; }
+.dash-kpi-icon { float: left; width: 1.15rem; height: 1.15rem; margin: .05rem .65rem 0 0; color: #38bdf8; }
+.dash-kpi-icon svg { width: 100%; height: 100%; }
+.dash-kpi-label { color: #b7cbe0; font-size: .62rem; white-space: nowrap; }
+.dash-kpi-value { margin-top: .18rem; color: #f3f8ff; font-size: 1.25rem; font-weight: 800; line-height: 1; }
+.dash-kpi-value small { color: #c5d5e5; font-size: .65rem; font-weight: 600; }
+.dash-kpi-detail { margin-top: .42rem; color: #8ea8c2; font-size: .53rem; }
+.dash-kpi-detail strong { color: #34d399; }
+@media (max-width: 900px) {
+    .dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+    .dash-kpis { grid-template-columns: 1fr; }
+}
+
 /* ── Gráficos nativos (line_chart, bar_chart) ── */
 [data-testid="stArrowVegaLiteChart"],
 [data-testid="stAltairChart"],
@@ -270,11 +331,11 @@ div[class*="resizeHandle"] { display: none !important; }
     overflow: hidden !important;
 }
 [data-testid="stCaptionContainer"] p {
-    color: #243a52 !important;
+    color: #d5e5f5 !important;
     font-weight: 700 !important;
-    font-size: .58rem !important;
-    letter-spacing: .12em !important;
-    text-transform: uppercase;
+    font-size: .72rem !important;
+    letter-spacing: .02em !important;
+    text-transform: none !important;
 }
 
 /* ── Títulos ── */
@@ -329,6 +390,72 @@ h3 { font-size: .88rem !important; font-weight: 600 !important; color: #a8c4de !
 .stMultiSelect span[data-baseweb="tag"] {
     background: rgba(77,156,248,.18) !important;
     border-radius: 4px !important;
+}
+.st-key-refresh_pause_button button,
+[class*="refresh_pause_button"] button {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    text-align: center !important;
+    font-size: 1.2rem !important;
+    line-height: 1 !important;
+}
+
+/* Selector de actualización: botones compactos tipo píldora. */
+[data-testid="stRadio"] > div[role="radiogroup"] {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: .45rem !important;
+}
+[data-testid="stRadio"] label {
+    width: auto !important;
+    min-width: 7rem;
+    min-height: 2rem;
+    padding: .35rem .85rem !important;
+    border: 1px solid rgba(126,164,202,.2) !important;
+    border-radius: 7px !important;
+    background: rgba(17,31,51,.8) !important;
+    color: #a9bed3 !important;
+    justify-content: center !important;
+    transition: background .1s linear, border-color .1s linear, color .1s linear !important;
+}
+[data-testid="stRadio"] label:hover {
+    border-color: #4d9cf8 !important;
+    background: rgba(77,156,248,.12) !important;
+    color: #e6f2ff !important;
+}
+[data-testid="stRadio"] label:has(input:checked) {
+    border-color: #4d9cf8 !important;
+    background: linear-gradient(135deg, #1769c2, #2453a5) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(39,111,207,.25);
+}
+[data-testid="stRadio"] label > div:first-child { display: none !important; }
+[data-testid="stRadio"] label > div:last-child {
+    width: 100% !important;
+    text-align: center !important;
+    justify-content: center !important;
+}
+[data-testid="stSegmentedControl"] {
+    width: 100% !important;
+}
+[data-testid="stSegmentedControl"] [data-baseweb="button-group"],
+[data-testid="stSegmentedControl"] [role="group"] {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: .28rem !important;
+    width: 100% !important;
+}
+[data-testid="stSegmentedControl"] button {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    padding-left: .7rem !important;
+    border-radius: 7px !important;
+    border: 1px solid rgba(126,164,202,.2) !important;
+    min-height: 1.85rem !important;
 }
 
 /* ── Dataframe ── */
@@ -389,11 +516,41 @@ h3 { font-size: .88rem !important; font-weight: 600 !important; color: #a8c4de !
 
 
 # ── Helpers API ────────────────────────────────────────────────────────────────
+def request_retry(method: str, url: str, attempts: int = 3, **kwargs):
+    """Realiza una petición con reintentos breves ante fallos transitorios."""
+    last_error = None
+    for attempt in range(attempts):
+        try:
+            return requests.request(method, url, **kwargs)
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            last_error = exc
+            if attempt < attempts - 1:
+                time.sleep(0.15 * (attempt + 1))
+    raise last_error
+
+
+def enviar_telegram(texto: str) -> bool:
+    """Envía un mensaje solo si Telegram está configurado."""
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        return False
+    try:
+        response = request_retry(
+            "POST",
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+            json={"chat_id": TELEGRAM_CHAT_ID, "text": texto},
+            timeout=8,
+        )
+        response.raise_for_status()
+        return True
+    except requests.RequestException:
+        return False
+
+
 def lortu_tokena(behartu: bool = False) -> str:
     tok = st.session_state.get("token")
     if not behartu and tok and tok["exp"] > time.time() + 10:
         return tok["access"]
-    r = requests.post(
+    r = request_retry("POST",
         f"{API_URL}/auth/token",
         data={"grant_type": "password", "username": API_USERNAME, "password": API_PASSWORD},
         timeout=5,
@@ -407,7 +564,7 @@ def lortu_tokena(behartu: bool = False) -> str:
 def iragarri(datuak: dict) -> dict:
     for i in range(2):
         tok = lortu_tokena(behartu=i > 0)
-        r = requests.post(f"{API_URL}/predict", json=datuak,
+        r = request_retry("POST", f"{API_URL}/predict", json=datuak,
                           headers={"Authorization": f"Bearer {tok}"}, timeout=10)
         if r.status_code == 401 and i == 0:
             continue
@@ -419,7 +576,7 @@ def iragarri(datuak: dict) -> dict:
 @st.cache_data(ttl=10, show_spinner=False)
 def api_egoera() -> tuple[bool, str]:
     try:
-        d = requests.get(f"{API_URL}/health", timeout=3).json()
+        d = request_retry("GET", f"{API_URL}/health", timeout=3).json()
         ok = bool(d.get("model_loaded"))
         return ok, "Modelo OK" if ok else "Sin modelo"
     except Exception:
@@ -428,7 +585,12 @@ def api_egoera() -> tuple[bool, str]:
 
 # ── Helpers Elasticsearch ──────────────────────────────────────────────────────
 def es_bilatu(body: dict) -> dict:
-    r = requests.post(f"{ES_URL}/{ES_INDEX}/_search", json=body, timeout=10)
+    try:
+        r = request_retry("POST", f"{ES_URL}/{ES_INDEX}/_search", json=body, timeout=10)
+    except (requests.ConnectionError, requests.Timeout) as exc:
+        raise ElasticsearchUnavailable from exc
+    if r.status_code == 404:
+        raise ElasticsearchIndexMissing
     r.raise_for_status()
     return r.json()
 
@@ -458,14 +620,14 @@ def cargar_dashboard() -> list[dict]:
     return cargar_documentos({
         "size": 1000,
         "sort": [{"timestamp": "desc"}],
-        "_source": ["timestamp", "machine_id", "failure_probability", "alert_level"],
+        "_source": ["timestamp", "machine_id", "failure_probability", "alert_level", "failure_predicted"],
     })
 
 
 def es_egoera() -> tuple[bool, int]:
     try:
         return True, es_count_cached()
-    except Exception:
+    except (ElasticsearchUnavailable, ElasticsearchIndexMissing, requests.RequestException):
         return False, 0
 
 
@@ -488,24 +650,59 @@ with st.sidebar:
     if "atal" not in st.session_state:
         st.session_state.atal = "Dashboard"
 
-    alertas_n = alerta_kopurua()
-
     nav = [
-        ("·", "Inicio",        "Dashboard"),
+        ("·", "Dashboard",     "Dashboard"),
         ("·", "Datos",         "Datos"),
         ("·", "Predicciones",  "Predicciones"),
-        ("·", f"Alertas{'  (' + str(alertas_n) + ')' if alertas_n else ''}", "Alertas"),
+        ("·", "Alertas", "Alertas"),
     ]
 
     for icon, label, key in nav:
         active = st.session_state.atal == key
-        marker = "▸" if active else "·"
-        if st.button(f"{marker}  {label}", key=f"nav_{key}", use_container_width=True,
-                     type="primary" if active else "secondary"):
+        marker = ""
+        clicked = st.button(f"{marker}  {label}", key=f"nav_{key}", use_container_width=True,
+                            type="primary" if active else "secondary")
+        if clicked:
             st.session_state.atal = key
             # Re-renderiza también la barra para que el estado activo cambie
             # en el mismo clic, no en la siguiente interacción.
             st.rerun()
+
+    refresh_options = {
+        " ": 0,
+        "30 s": 30,
+        "1 m": 60,
+        "10 m": 600,
+        "30 m": 1800,
+        "1 h": 3600,
+    }
+    st.caption("Actualización automática")
+    selected_refresh = st.session_state.get("auto_refresh_choice", " ")
+    refresh_items = list(refresh_options.items())
+    for row_start in range(0, len(refresh_items), 2):
+        option_cols = st.columns(2, gap="small")
+        for col, (refresh_label, refresh_value) in zip(option_cols, refresh_items[row_start:row_start + 2]):
+            with col:
+                if refresh_value == 0:
+                    with st.container(key="refresh_pause_button"):
+                        clicked = st.button(
+                            "⏸",
+                            key=f"refresh_option_{refresh_value}",
+                            use_container_width=True,
+                            type="primary" if selected_refresh == refresh_label else "secondary",
+                        )
+                else:
+                    clicked = st.button(
+                        refresh_label,
+                        key=f"refresh_option_{refresh_value}",
+                        use_container_width=True,
+                        type="primary" if selected_refresh == refresh_label else "secondary",
+                    )
+                if clicked:
+                    st.session_state["auto_refresh_choice"] = refresh_label
+                    st.session_state["auto_refresh_seconds"] = refresh_value
+                    st.rerun()
+    st.session_state["auto_refresh_seconds"] = refresh_options.get(selected_refresh, 0)
 
     atala = st.session_state.atal
 
@@ -529,6 +726,12 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+    if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
+        st.checkbox("Notificaciones Telegram", key="telegram_enabled", value=False,
+                    help="Envía una notificación cuando aparece una alerta nueva.")
+    else:
+        st.caption("Telegram no configurado")
+
     ordu = None
 
 
@@ -541,19 +744,19 @@ def altair_config():
             gridColor="rgba(255,255,255,.05)",
             domainColor="rgba(255,255,255,.08)",
             tickColor="transparent",
-            labelColor="#3a5572",
-            titleColor="#3a5572",
+            labelColor="#8ea8c2",
+            titleColor="#c3d5e6",
         ),
         configure_title=dict(color="#3a5572"),
     )
 
 
-def chart_bar(data, x, y, color_field=None, color_range=None, height=160):
+def chart_bar(data, x, y, color_field=None, color_range=None, height=140):
     base = (
         alt.Chart(data)
         .mark_bar(cornerRadiusTopLeft=5, cornerRadiusTopRight=5)
         .encode(
-            x=alt.X(x, title=None),
+            x=alt.X(x, title=None, axis=alt.Axis(labelAngle=0, labelLimit=140)),
             y=alt.Y(y, title=None),
             **({"color": alt.Color(color_field,
                                    scale=alt.Scale(range=color_range) if color_range else alt.Scale(scheme="blues"),
@@ -566,7 +769,7 @@ def chart_bar(data, x, y, color_field=None, color_range=None, height=160):
             gridColor="rgba(255,255,255,.05)",
             domainColor="rgba(255,255,255,.08)",
             tickColor="transparent",
-            labelColor="#3a5572",
+            labelColor="#8ea8c2",
         )
     )
     return base
@@ -578,7 +781,6 @@ def page_dashboard():
     <div class="page-header pg-in">
       <div>
         <h2>Dashboard · Mantenimiento Predictivo</h2>
-        <p>Resumen en tiempo real del estado de las máquinas CNC</p>
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -587,7 +789,14 @@ def page_dashboard():
     try:
         hits = cargar_dashboard()
         df = pd.DataFrame([h["_source"] for h in hits])
-    except Exception:
+    except ElasticsearchIndexMissing:
+        st.info(f"El índice `{ES_INDEX}` todavía no existe. Inicia el flujo de NiFi.")
+        return
+    except ElasticsearchUnavailable:
+        st.error("Elasticsearch no está disponible. Comprueba el servicio y la conexión.")
+        return
+    except Exception as exc:
+        st.error(f"No se pudieron cargar los datos: {exc}")
         df = pd.DataFrame()
 
     needed = {"timestamp", "machine_id", "failure_probability", "alert_level"}
@@ -603,17 +812,48 @@ def page_dashboard():
         return
 
     last = df.sort_values("timestamp").groupby("machine_id", as_index=False).tail(1)
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Máquinas",      last["machine_id"].nunique())
-    m2.metric("Sin alertas",   int((last["alert_level"] == "OK").sum()))
-    m3.metric("Con alerta",    int((last["alert_level"] != "OK").sum()))
-    m4.metric("Riesgo máximo", f"{last['failure_probability'].max():.1%}")
+    machines = int(last["machine_id"].nunique())
+    operational = int((last["alert_level"] == "OK").sum())
+    maintenance = max(machines - operational, 0)
+    uptime = operational / machines if machines else 0
+    active_alerts = int((last["alert_level"] != "OK").sum())
+    critical = int((last["alert_level"] == "LARRIA").sum())
+    warning = int((last["alert_level"] == "KONTUZ").sum())
+    failures = df[df["failure_predicted"].isin([True, "true", 1])].sort_values("timestamp")
+    intervals = failures.groupby("machine_id")["timestamp"].diff().dt.total_seconds().div(3600).dropna()
+    mtbf = intervals.mean() if not intervals.empty else None
+    mtbf_text = f"{mtbf:.0f}" if mtbf is not None else "—"
+    mtbf_suffix = " h" if mtbf is not None else ""
+    st.markdown(f"""
+    <div class="dash-kpis">
+      <div class="dash-kpi">
+        <div class="dash-kpi-icon">{SVG_FACTORY}</div><div class="dash-kpi-label">Máquinas en planta</div>
+        <div class="dash-kpi-value">{machines}</div>
+        <div class="dash-kpi-detail"><strong>{operational}</strong> operativas &nbsp;|&nbsp; {maintenance} en mantenimiento</div>
+      </div>
+      <div class="dash-kpi">
+        <div class="dash-kpi-icon">{SVG_SHIELD}</div><div class="dash-kpi-label">Disponibilidad (uptime)</div>
+        <div class="dash-kpi-value">{uptime:.1%}</div>
+        <div class="dash-kpi-detail"><strong>↑ Datos en tiempo real</strong></div>
+      </div>
+      <div class="dash-kpi alert">
+        <div class="dash-kpi-icon">{SVG_ALERT}</div><div class="dash-kpi-label">Alertas activas</div>
+        <div class="dash-kpi-value">{active_alerts}</div>
+        <div class="dash-kpi-detail"><strong>{critical}</strong> críticas &nbsp;|&nbsp; {warning} advertencias</div>
+      </div>
+      <div class="dash-kpi blue">
+        <div class="dash-kpi-icon">{SVG_CLOCK}</div><div class="dash-kpi-label">MTBF (tiempo medio entre fallos)</div>
+        <div class="dash-kpi-value">{mtbf_text}<small>{mtbf_suffix}</small></div>
+        <div class="dash-kpi-detail"><strong>↑ Calculado con el histórico disponible</strong></div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
     with c1:
-        st.caption("DISTRIBUCIÓN DE ALERTAS")
+        st.caption("Distribución de alertas")
         dist = (df["alert_level"].value_counts()
                   .reindex(MAILAK).fillna(0)
                   .rename_axis("nivel").reset_index(name="n"))
@@ -625,14 +865,14 @@ def page_dashboard():
         st.altair_chart(ch, use_container_width=True)
 
     with c2:
-        st.caption("EVOLUCIÓN DEL RIESGO (media 5 min)")
+        st.caption("Evolución del riesgo (media 5 min)")
         serie = (df.set_index("timestamp").sort_index()
                    .groupby(pd.Grouper(freq="5min"))["failure_probability"].mean())
-        st.line_chart(serie, color="#38bdf8", height=160)
+        st.line_chart(serie, color="#38bdf8", height=140)
 
     c3, c4 = st.columns(2)
     with c3:
-        st.caption("TOP MÁQUINAS POR RIESGO")
+        st.caption("Top de máquinas por riesgo")
         top_maq = (df.groupby("machine_id", as_index=False)["failure_probability"]
                      .max().nlargest(10, "failure_probability"))
         ch2 = (
@@ -646,19 +886,19 @@ def page_dashboard():
                                 legend=None),
                 tooltip=["machine_id:N", alt.Tooltip("failure_probability:Q", format=".1%")],
             )
-            .properties(width="container", height=160)
+            .properties(width="container", height=140)
             .configure_view(strokeWidth=0, fill="transparent")
             .configure_axis(
                 gridColor="rgba(255,255,255,.05)",
                 domainColor="rgba(255,255,255,.08)",
                 tickColor="transparent",
-                labelColor="#3a5572",
+                labelColor="#8ea8c2",
             )
         )
         st.altair_chart(ch2, use_container_width=True)
 
     with c4:
-        st.caption("DISTRIBUCIÓN DE PROBABILIDADES")
+        st.caption("Distribución de probabilidades")
         bins = pd.cut(df["failure_probability"], bins=[0,.2,.4,.6,.8,1], include_lowest=True)
         hdf  = bins.value_counts().sort_index().rename_axis("rango").reset_index(name="n")
         hdf["rango"] = hdf["rango"].astype(str)
@@ -672,7 +912,6 @@ def page_predicciones():
     <div class="page-header pg-in">
       <div>
         <h2>Predicción Manual</h2>
-        <p>Introduce los valores de los sensores para obtener la probabilidad de fallo</p>
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -697,12 +936,25 @@ def page_predicciones():
         submit = st.form_submit_button("Ejecutar predicción", type="primary")
 
     if submit:
+        machine_id = machine_id.strip()
+        if not machine_id:
+            st.error("Introduce un ID de máquina válido.")
+            return
         try:
             res   = iragarri({"machine_id": machine_id, "machine_type": machine_type,
                                "air_temp_K": air, "process_temp_K": proc,
                                "rpm": rpm, "torque_Nm": torque, "tool_wear_min": wear})
             nivel = res["alert_level"]
             prob  = res["failure_probability"]
+
+            historial = st.session_state.setdefault("predicciones_historial", [])
+            historial.insert(0, {
+                "Máquina": machine_id,
+                "Nivel": nivel,
+                "Prob. fallo": f"{prob:.1%}",
+                "Fallo predicho": "Sí" if res["failure_predicted"] else "No",
+            })
+            del historial[10:]
 
             r1, r2, r3 = st.columns(3)
             r1.metric("Nivel de alerta",     nivel)
@@ -711,6 +963,13 @@ def page_predicciones():
             st.progress(float(min(max(prob, 0), 1)))
             {"OK": st.success, "KONTUZ": st.warning, "LARRIA": st.error}[nivel](
                 f"{machine_id} → {nivel}  ({prob:.1%})")
+            st.caption("Últimas predicciones de esta sesión")
+            st.dataframe(
+                pd.DataFrame(st.session_state["predicciones_historial"]),
+                use_container_width=True,
+                hide_index=True,
+                height=230,
+            )
         except requests.HTTPError as e:
             st.error(f"Error API {e.response.status_code}: {e.response.text[:300]}")
         except Exception as e:
@@ -725,7 +984,12 @@ def cargar_df(sel: list[str], size: int = 2000) -> pd.DataFrame:
         "query": {"bool": {"filter": [{"terms": {"alert_level.keyword": sel}}]}},
         "_source": ["timestamp", "machine_id", "failure_probability", "alert_level", "failure_predicted"],
     })
-    df = pd.DataFrame([h["_source"] for h in hits])
+    rows = []
+    for hit in hits:
+        row = dict(hit["_source"])
+        row["event_id"] = hit.get("_id", f'{row.get("timestamp", "")}-{row.get("machine_id", "")}')
+        rows.append(row)
+    df = pd.DataFrame(rows)
     if not df.empty:
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
         df["failure_probability"] = pd.to_numeric(df["failure_probability"], errors="coerce")
@@ -735,15 +999,23 @@ def cargar_df(sel: list[str], size: int = 2000) -> pd.DataFrame:
 
 def page_datos():
     st.markdown(f"""<div class="page-header pg-in"><div><h2>Explorador de datos</h2>
-    <p>Consulta, filtra y revisa las predicciones almacenadas · {ES_INDEX}</p></div></div>""", unsafe_allow_html=True)
+    </div></div>""", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([2, 1, 1])
-    sel = c1.multiselect("Niveles", MAILAK, default=MAILAK, key="datos_niveles")
+    with c1:
+        st.caption("Niveles")
+        nivel_cols = st.columns(3)
+        sel = [nivel for col, nivel in zip(nivel_cols, MAILAK)
+               if col.checkbox(nivel, value=True, key=f"datos_nivel_{nivel}")]
     limite = c2.selectbox("Registros", [200, 500, 1000, 2000], index=1, key="datos_limite")
     buscar = c3.text_input("Máquina", placeholder="CNC-001", key="datos_maquina").strip()
     if not sel:
         st.warning("Selecciona al menos un nivel."); return
     try:
         df = cargar_df(sel, limite)
+    except ElasticsearchIndexMissing:
+        st.info(f"El índice `{ES_INDEX}` todavía no existe. Inicia el flujo de NiFi."); return
+    except ElasticsearchUnavailable:
+        st.error("Elasticsearch no está disponible. Comprueba el servicio y la conexión."); return
     except Exception as e:
         st.error(f"No se pudieron cargar los datos: {e}"); return
     if buscar:
@@ -754,7 +1026,7 @@ def page_datos():
     m1.metric("Registros mostrados", f"{len(df):,}")
     m2.metric("Máquinas", df["machine_id"].nunique())
     m3.metric("Riesgo medio", f"{df['failure_probability'].mean():.1%}")
-    st.caption("EVOLUCIÓN DEL RIESGO Y VOLUMEN DE PREDICCIONES")
+    st.caption("Evolución del riesgo y volumen de predicciones")
     serie = df.set_index("timestamp").resample("15min")["failure_probability"].agg(["mean", "count"])
     st.line_chart(serie.rename(columns={"mean": "Riesgo medio", "count": "Predicciones"}), height=180)
     st.markdown(f"**Registros** — {len(df):,}")
@@ -771,57 +1043,84 @@ def page_datos():
 
 # ── Alertas ────────────────────────────────────────────────────────────────────
 def page_alertas():
-    st.markdown("""<div class="page-header pg-in"><div><h2>Centro de alertas</h2>
-    <p>Prioriza incidencias y localiza rápidamente las máquinas con mayor riesgo</p></div>
-    <span class="ph-badge">CONSULTA OPTIMIZADA · 10 s</span></div>""", unsafe_allow_html=True)
+    st.markdown("""<div class="page-header pg-in"><div><h2>Alertas</h2>
+    </div></div>""", unsafe_allow_html=True)
     try:
-        df = cargar_df(["KONTUZ", "LARRIA"], 2000)
+        df = cargar_df(MAILAK, 2000)
+    except ElasticsearchIndexMissing:
+        st.info(f"El índice `{ES_INDEX}` todavía no existe. Inicia el flujo de NiFi."); return
+    except ElasticsearchUnavailable:
+        st.error("Elasticsearch no está disponible. Comprueba el servicio y la conexión."); return
     except Exception as e:
         st.error(f"No se pudieron cargar las alertas: {e}"); return
     if df.empty:
-        st.success("No hay alertas activas en los registros recientes."); return
+        st.success("No hay eventos registrados."); return
+    if st.session_state.get("telegram_enabled", False):
+        enviados = st.session_state.setdefault("telegram_alertas_enviadas", set())
+        for _, alerta in df[df["alert_level"] != "OK"].head(20).iterrows():
+            event_id = alerta["event_id"]
+            if event_id in enviados:
+                continue
+            nivel = "CRÍTICA" if alerta["alert_level"] == "LARRIA" else "ADVERTENCIA"
+            mensaje = (
+                f"🚨 CNC Guard · {nivel}\n"
+                f"Máquina: {alerta.get('machine_id', 'N/D')}\n"
+                f"Probabilidad de fallo: {float(alerta.get('failure_probability', 0)):.1%}\n"
+                f"Fecha: {alerta.get('timestamp', 'N/D')}"
+            )
+            if enviar_telegram(mensaje):
+                enviados.add(event_id)
+    f1, f2, f3 = st.columns([1.25, 1.25, 2])
+    maquina = f1.selectbox("Máquina", ["Todas las máquinas"] + sorted(df["machine_id"].dropna().unique().tolist()), key="alerta_maquina")
+    periodo = f2.selectbox("Periodo", ["Últimos 7 días", "Últimos 30 días", "Todo el histórico"], key="alerta_periodo")
+    if maquina != "Todas las máquinas":
+        df = df[df["machine_id"] == maquina]
+    if periodo != "Todo el histórico" and not df.empty:
+        limite = df["timestamp"].max() - pd.Timedelta(days=7 if periodo.startswith("Últimos 7") else 30)
+        df = df[df["timestamp"] >= limite]
     criticas = int((df["alert_level"] == "LARRIA").sum())
-    afectadas = df.loc[df["alert_level"] != "OK", "machine_id"].nunique()
-    riesgo = df["failure_probability"].max()
-    a1, a2, a3, a4 = st.columns(4)
-    a1.metric("Alertas visibles", len(df)); a2.metric("Críticas", criticas)
-    a3.metric("Máquinas afectadas", afectadas); a4.metric("Riesgo máximo", f"{riesgo:.1%}")
-    left, right = st.columns([1, 2])
-    with left:
-        st.caption("SEVERIDAD")
-        severidad = (df["alert_level"].value_counts()
-                     .reindex(["LARRIA", "KONTUZ"]).fillna(0)
-                     .rename_axis("nivel").reset_index(name="n"))
-        st.altair_chart(
-            chart_bar(severidad, "nivel:N", "n:Q", color_field="nivel:N",
-                      color_range=["#fb7185", "#fbbf24"], height=190),
-            use_container_width=True,
-        )
-    with right:
-        st.caption("MÁQUINAS QUE REQUIEREN ATENCIÓN")
-        top = df.groupby("machine_id", as_index=False).agg(
-            riesgo_max=("failure_probability", "max"), eventos=("alert_level", "size"), ultima=("timestamp", "max")
-        ).sort_values(["riesgo_max", "eventos"], ascending=False).head(15)
-        st.dataframe(top, use_container_width=True, hide_index=True, height=220, column_config={
-            "riesgo_max": st.column_config.ProgressColumn("Riesgo máx.", min_value=0.0, max_value=1.0, format="%.1%"),
-            "ultima": st.column_config.DatetimeColumn("Último evento", format="DD/MM/YYYY HH:mm"),
-        })
-    st.caption("ÚLTIMOS EVENTOS · ordenados por riesgo")
-    recientes = df.sort_values(["failure_probability", "timestamp"], ascending=False).head(100)
-    st.dataframe(recientes, use_container_width=True, hide_index=True, height=300, column_config={
-        "timestamp": st.column_config.DatetimeColumn("Fecha / Hora", format="DD/MM/YYYY HH:mm:ss"),
-        "failure_probability": st.column_config.ProgressColumn("Prob. fallo", min_value=0.0, max_value=1.0, format="%.1%"),
+    advertencias = int((df["alert_level"] == "KONTUZ").sum())
+    informativas = int((df["alert_level"] == "OK").sum())
+    nivel = st.radio("", [f"Todas ({len(df)})", f"Críticas ({criticas})", f"Advertencias ({advertencias})", f"Informativas ({informativas})"], horizontal=True, key="alerta_nivel", label_visibility="collapsed")
+    nivel = nivel.split(" (")[0]
+    nivel_map = {"Todas": None, "Críticas": "LARRIA", "Advertencias": "KONTUZ", "Informativas": "OK"}
+    if nivel_map[nivel]:
+        df = df[df["alert_level"] == nivel_map[nivel]]
+    if df.empty:
+        st.info("No hay alertas para los filtros seleccionados."); return
+    tabla = df.sort_values("timestamp", ascending=False).copy()
+    tabla["Fecha y hora"] = tabla["timestamp"]
+    tabla["Máquina"] = tabla["machine_id"]
+    tabla["Tipo"] = tabla["alert_level"].map({"LARRIA": "Crítica", "KONTUZ": "Advertencia", "OK": "Informativa"})
+    tabla["Descripción"] = tabla["alert_level"].map({"LARRIA": "Posible fallo crítico · requiere revisión inmediata", "KONTUZ": "Condición anómala · revisar en el próximo mantenimiento", "OK": "Mantenimiento recomendado · sin anomalía crítica"})
+    tabla["Valor"] = tabla["failure_probability"].map(lambda value: f"{value:.1%}")
+    tabla["Estado"] = "● Activa"
+    st.dataframe(tabla[["Fecha y hora", "Máquina", "Tipo", "Descripción", "Valor", "Estado"]], use_container_width=True, hide_index=True, height=430, column_config={
+        "Fecha y hora": st.column_config.DatetimeColumn(format="DD/MM/YYYY HH:mm"),
+        "Descripción": st.column_config.TextColumn(width="large"),
     })
     if st.button("↺ Actualizar alertas", key="refresh_alertas"):
         cargar_documentos.clear(); cargar_dashboard.clear(); alerta_kopurua_cached.clear(); st.rerun()
 
 
 # ── Router ─────────────────────────────────────────────────────────────────────
-if atala == "Dashboard":
-    page_dashboard()
-elif atala == "Predicciones":
-    page_predicciones()
-elif atala == "Datos":
-    page_datos()
-elif atala == "Alertas":
-    page_alertas()
+def render_page():
+    if atala == "Dashboard":
+        page_dashboard()
+    elif atala == "Predicciones":
+        page_predicciones()
+    elif atala == "Datos":
+        page_datos()
+    elif atala == "Alertas":
+        page_alertas()
+
+
+refresh_seconds = st.session_state.get("auto_refresh_seconds", 0)
+if refresh_seconds and hasattr(st, "fragment"):
+    @st.fragment(run_every=refresh_seconds)
+    def render_auto_refresh():
+        render_page()
+
+    render_auto_refresh()
+else:
+    render_page()
