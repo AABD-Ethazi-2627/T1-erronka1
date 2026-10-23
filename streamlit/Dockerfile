@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py .
+COPY app.py config.py ./
+COPY ui ./ui
 
 EXPOSE 8501
 
