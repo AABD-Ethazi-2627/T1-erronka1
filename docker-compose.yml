@@ -11,6 +11,7 @@ volumes:
   nifi-data:       # NiFi flow-en iraunkortasuna
   filebeat-data:   # Filebeat registry (zer fitxategi irakurri den gogoratzeko)
   es-data:         # Elasticsearch datuen iraunkortasuna
+  telegram_state:  # Telegram notifier-ak bidalitako alertak gogoratzeko
   # Simuladorearen CSV-ak Samba (SMB/CIFS) bidez muntatuta, Filebeat-ek irakurtzeko.
   # device formatua: //IP/share (ez smb://). addr= beharrezkoa da Docker Desktop-en.
   cnc-stream-cifs:
@@ -182,8 +183,6 @@ services:
       API_PASSWORD: ${API_PASSWORD:?API_PASSWORD falta da .env-n}
       ES_URL: http://elasticsearch:9200
       ES_INDEX: cnc-predictions
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     depends_on:
       scoring-api:
         condition: service_healthy
@@ -194,6 +193,27 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
+    restart: unless-stopped
+    networks:
+      - cnc-net
+
+  # ── Telegram notifier — alertak Telegram-era bidaltzen ditu (panela itxita egon arren) ──
+  telegram-notifier:
+    build:
+      context: ./telegram-notifier
+    container_name: cnc-telegram-notifier
+    environment:
+      ES_URL: http://elasticsearch:9200
+      ES_INDEX: cnc-predictions
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      POLL_SECONDS: 15
+      STATE_FILE: /state/seen.json
+    volumes:
+      - telegram_state:/state
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - cnc-net
