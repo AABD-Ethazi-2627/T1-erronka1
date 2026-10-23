@@ -47,9 +47,19 @@ st.markdown("""
     background: #060d1a !important;
     color: #d8e6f3;
 }
-[data-testid="stHeader"]      { background: transparent !important; }
+[data-testid="stHeader"]      { display: none !important; height: 0 !important; }
 [data-testid="stToolbar"]     { display: none !important; }
-.block-container              { max-width: 1500px; padding: 0 1rem .5rem !important; }
+[data-testid="stDecoration"]  { display: none !important; }
+[data-testid="stAppViewBlockContainer"] { padding-top: 0 !important; }
+[data-testid="stMainBlockContainer"] { padding-top: 0 !important; }
+.stMainBlockContainer, .stAppViewBlockContainer { padding-top: 0 !important; }
+[data-testid="stAppViewContainer"] { padding-top: 0 !important; }
+[data-testid="stAppViewContainer"] > .main { padding-top: 0 !important; }
+[data-testid="stAppViewContainer"] > .main > div { padding-top: 0 !important; }
+section.main > div { padding-top: 0 !important; }
+[data-testid="stAppViewContainer"] main { padding-top: 0 !important; }
+[data-testid="stSidebarContent"] { padding-top: 0 !important; margin-top: -5rem !important; }
+.block-container              { max-width: 1500px; padding: 0 1rem .5rem !important; margin-top: -1.5rem !important; }
 
 /* ── Sidebar fija, sin colapsar ── */
 [data-testid="stSidebar"] {
@@ -397,6 +407,9 @@ h3 { font-size: .88rem !important; font-weight: 600 !important; color: #a8c4de !
     font-size: 1.2rem !important;
     line-height: 1 !important;
 }
+/* El refresco se controla mediante el deslizador; se ocultan los controles
+   auxiliares heredados para evitar duplicar la interfaz. */
+[class*="st-key-refresh_option_"] { display: none !important; }
 
 /* Selector de actualización: botones compactos tipo píldora. */
 [data-testid="stRadio"] > div[role="radiogroup"] {
@@ -498,6 +511,22 @@ h3 { font-size: .88rem !important; font-weight: 600 !important; color: #a8c4de !
 }
 
 /* Evita animaciones innecesarias en equipos configurados para reducir movimiento. */
+.stApp,
+[data-testid="stSidebar"],
+[data-testid="stHeader"],
+.page-header,
+[data-testid="stMetric"],
+[data-testid="stForm"],
+[data-testid="stAltairChart"],
+[data-testid="stVegaLiteChart"],
+.dash-kpi,
+button,
+input,
+[data-baseweb="select"] > div {
+    transition: background-color .35s ease, color .35s ease,
+                border-color .35s ease, box-shadow .35s ease !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;
@@ -676,8 +705,17 @@ with st.sidebar:
         "1 h": 3600,
     }
     st.caption("Actualización automática")
-    selected_refresh = st.session_state.get("auto_refresh_choice", " ")
-    refresh_items = list(refresh_options.items())
+    selected_refresh = st.select_slider(
+        "Intervalo",
+        options=list(refresh_options),
+        format_func=lambda value: "Desactivado" if value == " " else value,
+        value=st.session_state.get("auto_refresh_choice", " "),
+        key="auto_refresh_choice",
+        label_visibility="collapsed",
+        help="Actualiza el contenido automáticamente sin recargar la barra lateral.",
+    )
+    # La interfaz activa usa únicamente el select_slider.
+    refresh_items = []
     for row_start in range(0, len(refresh_items), 2):
         option_cols = st.columns(2, gap="small")
         for col, (refresh_label, refresh_value) in zip(option_cols, refresh_items[row_start:row_start + 2]):
@@ -740,7 +778,7 @@ with st.sidebar:
 
 # ── Helpers visualización ──────────────────────────────────────────────────────
 def altair_config():
-    light = current_theme() != "dark"
+    light = current_theme() == "light"
     """Configuración común para gráficos Altair con fondo transparente."""
     return dict(
         configure_view=dict(strokeWidth=0, fill="#ffffff" if light else "transparent"),
@@ -756,7 +794,7 @@ def altair_config():
 
 
 def chart_bar(data, x, y, color_field=None, color_range=None, height=140):
-    light = current_theme() != "dark"
+    light = current_theme() == "light"
     base = (
         alt.Chart(data)
         .mark_bar(cornerRadiusTopLeft=5, cornerRadiusTopRight=5)
@@ -768,7 +806,7 @@ def chart_bar(data, x, y, color_field=None, color_range=None, height=140):
                                    legend=None)} if color_field else {}),
             tooltip=[x, y],
         )
-        .properties(width="container", height=height, background="#ffffff" if light else "#0b1018")
+        .properties(width="container", height=height, background="#ffffff" if light else "transparent")
         .configure_view(strokeWidth=0, fill="#ffffff" if light else "transparent")
         .configure_axis(
             gridColor="#dbe4ef" if light else "rgba(255,255,255,.05)",
@@ -874,16 +912,16 @@ def page_dashboard():
         serie = (df.set_index("timestamp").sort_index()
                    .groupby(pd.Grouper(freq="5min"))["failure_probability"].mean())
         serie_chart = alt.Chart(serie.reset_index(name="risk")).mark_line(
-            color="#087ea4" if current_theme() != "dark" else "#38bdf8"
+            color="#087ea4" if current_theme() == "light" else "#38bdf8"
         ).encode(
             x=alt.X("timestamp:T", title=None),
             y=alt.Y("risk:Q", title=None),
-        ).properties(width="container", height=140, background="#ffffff" if current_theme() != "dark" else "#0b1018")
-        st.altair_chart(serie_chart.configure_view(strokeWidth=0, fill="#ffffff" if current_theme() != "dark" else "transparent").configure_axis(
-            gridColor="#dbe4ef" if current_theme() != "dark" else "rgba(255,255,255,.05)",
-            domainColor="#b9c9d9" if current_theme() != "dark" else "rgba(255,255,255,.08)",
-            tickColor="#b9c9d9" if current_theme() != "dark" else "transparent",
-            labelColor="#405b75" if current_theme() != "dark" else "#8ea8c2",
+        ).properties(width="container", height=140, background="#ffffff" if current_theme() == "light" else "transparent")
+        st.altair_chart(serie_chart.configure_view(strokeWidth=0, fill="#ffffff" if current_theme() == "light" else "transparent").configure_axis(
+            gridColor="#dbe4ef" if current_theme() == "light" else "rgba(255,255,255,.05)",
+            domainColor="#b9c9d9" if current_theme() == "light" else "rgba(255,255,255,.08)",
+            tickColor="#b9c9d9" if current_theme() == "light" else "transparent",
+            labelColor="#405b75" if current_theme() == "light" else "#8ea8c2",
         ), use_container_width=True)
 
     c3, c4 = st.columns(2)
@@ -891,7 +929,7 @@ def page_dashboard():
         st.caption("Top de máquinas por riesgo")
         top_maq = (df.groupby("machine_id", as_index=False)["failure_probability"]
                      .max().nlargest(10, "failure_probability"))
-        light = current_theme() != "dark"
+        light = current_theme() == "light"
         ch2 = (
             alt.Chart(top_maq)
             .mark_bar(cornerRadiusEnd=5)
@@ -903,7 +941,7 @@ def page_dashboard():
                                 legend=None),
                 tooltip=["machine_id:N", alt.Tooltip("failure_probability:Q", format=".1%")],
             )
-            .properties(width="container", height=140, background="#ffffff" if light else "#0b1018")
+            .properties(width="container", height=140, background="#ffffff" if light else "transparent")
             .configure_view(strokeWidth=0, fill="#ffffff" if light else "transparent")
             .configure_axis(
                 gridColor="#dbe4ef" if light else "rgba(255,255,255,.05)",
@@ -1019,6 +1057,22 @@ def cargar_df(sel: list[str], size: int = 2000) -> pd.DataFrame:
     return df
 
 
+def tabla_estilo(df: pd.DataFrame):
+    """Estilo explícito para que las tablas sigan el tema claro."""
+    if current_theme() == "dark":
+        return df
+    return df.style.set_properties(
+        **{
+            "background-color": "#ffffff",
+            "color": "#263f58",
+            "border-color": "#dbe4ef",
+        }
+    ).set_table_styles([
+        {"selector": "th", "props": [("background-color", "#edf4fb"), ("color", "#294563"), ("font-weight", "600")]},
+        {"selector": "tr:hover td", "props": [("background-color", "#f4f8fc")]},
+    ])
+
+
 def page_datos():
     st.markdown(f"""<div class="page-header pg-in"><div><h2>Explorador de datos</h2>
     </div></div>""", unsafe_allow_html=True)
@@ -1050,7 +1104,7 @@ def page_datos():
     m3.metric("Riesgo medio", f"{df['failure_probability'].mean():.1%}")
     st.caption("Evolución del riesgo y volumen de predicciones")
     serie = df.set_index("timestamp").resample("15min")["failure_probability"].agg(["mean", "count"])
-    light = current_theme() != "dark"
+    light = current_theme() == "light"
     datos_serie = serie.reset_index().rename(columns={"mean": "risk", "count": "predictions"})
     base_chart = alt.Chart(datos_serie).encode(x=alt.X("timestamp:T", title=None))
     volumen = base_chart.mark_bar(color="#b9d7e8" if light else "#24577a", opacity=0.45).encode(
@@ -1060,7 +1114,7 @@ def page_datos():
         y=alt.Y("risk:Q", title="Riesgo medio", axis=alt.Axis(format="%"))
     )
     datos_chart = alt.layer(volumen, riesgo).resolve_scale(y="independent").properties(
-        width="container", height=180, background="#ffffff" if light else "#0b1018"
+        width="container", height=180, background="#ffffff" if light else "transparent"
     ).configure_view(strokeWidth=0).configure_axis(
         gridColor="#dbe4ef" if light else "rgba(255,255,255,.05)",
         domainColor="#b9c9d9" if light else "rgba(255,255,255,.08)",
@@ -1127,6 +1181,16 @@ def page_alertas():
         df = df[df["alert_level"] == nivel_map[nivel]]
     if df.empty:
         st.info("No hay alertas para los filtros seleccionados."); return
+    # DiagnÃ³stico visible de los datos que llegan actualmente desde Elasticsearch.
+    print("[CNC Guard] Datos CNC recibidos:")
+    print(df[["timestamp", "machine_id", "failure_probability", "alert_level"]].head(20).to_string(index=False))
+    with st.expander("Ver datos recibidos de los CNC", expanded=False):
+        st.code(
+            df[["timestamp", "machine_id", "failure_probability", "alert_level"]]
+            .head(20)
+            .to_string(index=False),
+            language="text",
+        )
     tabla = df.sort_values("timestamp", ascending=False).copy()
     tabla["Fecha y hora"] = tabla["timestamp"]
     tabla["Máquina"] = tabla["machine_id"]
