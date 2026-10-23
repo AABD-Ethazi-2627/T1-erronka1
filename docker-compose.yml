@@ -19,7 +19,7 @@ volumes:
     driver_opts:
       type: cifs
       device: "//${SMB_IP}/cnc-stream"
-      o: "addr=${SMB_IP},username=${SMB_USERNAME},password=${SMB_PASSWORD:?SMB_PASSWORD falta da .env-n},vers=3.0,ro"
+      o: "addr=${SMB_IP},username=${SMB_USERNAME},password=${SMB_PASSWORD:?SMB_PASSWORD falta da .env-n},vers=3.0,ro,actimeo=0,cache=none"
 
 services:
 
