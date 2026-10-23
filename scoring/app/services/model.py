@@ -11,7 +11,7 @@ from cnc_ml.columns import RAW_FEATURES
 log = logging.getLogger(__name__)
 
 # Alerta-mailen mugak: OK <= %50 < KONTUZ <= %80 < LARRIA
-FAILURE_THRESHOLD = 0.5
+FAILURE_THRESHOLD = 0.4
 LARRIA_THRESHOLD = 0.8
 
 
