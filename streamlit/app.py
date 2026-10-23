@@ -9,7 +9,7 @@ import requests
 import streamlit as st
 
 from config import (API_PASSWORD, API_URL, API_USERNAME, ES_INDEX, ES_URL,
-                    MAILAK, TELEGRAM_CHAT_ID, TELEGRAM_TOKEN)
+                    MAILAK)
 from ui.theme import apply_theme, current_theme, render_theme_switch
 
 SVG_FACTORY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 21h18v-2H3v2Zm2-4h3V8H5v9Zm5 0h4V3h-4v14Zm6 0h3v-6h-3v6Z"/></svg>'
@@ -557,23 +557,6 @@ def request_retry(method: str, url: str, attempts: int = 3, **kwargs):
     raise last_error
 
 
-def enviar_telegram(texto: str) -> bool:
-    """Envía un mensaje solo si Telegram está configurado."""
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        return False
-    try:
-        response = request_retry(
-            "POST",
-            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-            json={"chat_id": TELEGRAM_CHAT_ID, "text": texto},
-            timeout=8,
-        )
-        response.raise_for_status()
-        return True
-    except requests.RequestException:
-        return False
-
-
 def lortu_tokena(behartu: bool = False) -> str:
     tok = st.session_state.get("token")
     if not behartu and tok and tok["exp"] > time.time() + 10:
@@ -767,11 +750,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
-        st.checkbox("Notificaciones Telegram", key="telegram_enabled", value=False,
-                    help="Envía una notificación cuando aparece una alerta nueva.")
-    else:
-        st.caption("Telegram no configurado")
+    st.caption("Alertas a Telegram: servicio en segundo plano")
 
     ordu = None
 
@@ -1148,21 +1127,6 @@ def page_alertas():
         st.error(f"No se pudieron cargar las alertas: {e}"); return
     if df.empty:
         st.success("No hay eventos registrados."); return
-    if st.session_state.get("telegram_enabled", False):
-        enviados = st.session_state.setdefault("telegram_alertas_enviadas", set())
-        for _, alerta in df[df["alert_level"] != "OK"].head(20).iterrows():
-            event_id = alerta["event_id"]
-            if event_id in enviados:
-                continue
-            nivel = alerta["alert_level"]
-            mensaje = (
-                f"🚨 CNC Guard · {nivel}\n"
-                f"Máquina: {alerta.get('machine_id', 'N/D')}\n"
-                f"Probabilidad de fallo: {float(alerta.get('failure_probability', 0)):.1%}\n"
-                f"Fecha: {alerta.get('timestamp', 'N/D')}"
-            )
-            if enviar_telegram(mensaje):
-                enviados.add(event_id)
     f1, f2, f3 = st.columns([1.25, 1.25, 2])
     maquina = f1.selectbox("Máquina", ["Todas las máquinas"] + sorted(df["machine_id"].dropna().unique().tolist()), key="alerta_maquina")
     periodo = f2.selectbox("Periodo", ["Últimos 7 días", "Últimos 30 días", "Todo el histórico"], key="alerta_periodo")
