@@ -8,15 +8,10 @@ import pandas as pd
 import requests
 import streamlit as st
 
-API_URL      = os.getenv("API_URL",      "http://scoring-api:8000").rstrip("/")
-API_USERNAME = os.getenv("API_USERNAME", "nifi")
-API_PASSWORD = os.getenv("API_PASSWORD", "")
-ES_URL       = os.getenv("ES_URL",       "http://elasticsearch:9200").rstrip("/")
-ES_INDEX     = os.getenv("ES_INDEX",     "cnc-predictions")
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+from config import (API_PASSWORD, API_URL, API_USERNAME, ES_INDEX, ES_URL,
+                    MAILAK, TELEGRAM_CHAT_ID, TELEGRAM_TOKEN)
+from ui.theme import apply_theme, current_theme, render_theme_switch
 
-MAILAK   = ["OK", "KONTUZ", "LARRIA"]
 SVG_FACTORY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 21h18v-2H3v2Zm2-4h3V8H5v9Zm5 0h4V3h-4v14Zm6 0h3v-6h-3v6Z"/></svg>'
 SVG_SHIELD = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 4 5v6c0 5.2 3.4 9.8 8 11 4.6-1.2 8-5.8 8-11V5l-8-3Zm-1 14-3-3 1.4-1.4L11 13.2l3.6-3.6L16 11l-5 5Z"/></svg>'
 SVG_ALERT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3 1.8 20h20.4L12 3Zm1 13h-2v-2h2v2Zm0-4h-2V8h2v4Z"/></svg>'
@@ -514,6 +509,10 @@ h3 { font-size: .88rem !important; font-weight: 600 !important; color: #a8c4de !
 </style>
 """, unsafe_allow_html=True)
 
+# El tema claro se aplica después de los estilos base para que sus overrides
+# tengan prioridad. El valor se conserva en session_state durante los reruns.
+apply_theme()
+
 
 # ── Helpers API ────────────────────────────────────────────────────────────────
 def request_retry(method: str, url: str, attempts: int = 3, **kwargs):
@@ -704,6 +703,10 @@ with st.sidebar:
                     st.rerun()
     st.session_state["auto_refresh_seconds"] = refresh_options.get(selected_refresh, 0)
 
+    st.divider()
+    st.caption("Apariencia")
+    render_theme_switch()
+
     atala = st.session_state.atal
 
     st.divider()
@@ -737,21 +740,23 @@ with st.sidebar:
 
 # ── Helpers visualización ──────────────────────────────────────────────────────
 def altair_config():
+    light = current_theme() != "dark"
     """Configuración común para gráficos Altair con fondo transparente."""
     return dict(
-        configure_view=dict(strokeWidth=0, fill="transparent"),
+        configure_view=dict(strokeWidth=0, fill="#ffffff" if light else "transparent"),
         configure_axis=dict(
-            gridColor="rgba(255,255,255,.05)",
-            domainColor="rgba(255,255,255,.08)",
-            tickColor="transparent",
-            labelColor="#8ea8c2",
-            titleColor="#c3d5e6",
+            gridColor="#dbe4ef" if light else "rgba(255,255,255,.05)",
+            domainColor="#b9c9d9" if light else "rgba(255,255,255,.08)",
+            tickColor="#b9c9d9" if light else "transparent",
+            labelColor="#405b75" if light else "#8ea8c2",
+            titleColor="#294563" if light else "#c3d5e6",
         ),
         configure_title=dict(color="#3a5572"),
     )
 
 
 def chart_bar(data, x, y, color_field=None, color_range=None, height=140):
+    light = current_theme() != "dark"
     base = (
         alt.Chart(data)
         .mark_bar(cornerRadiusTopLeft=5, cornerRadiusTopRight=5)
@@ -763,13 +768,13 @@ def chart_bar(data, x, y, color_field=None, color_range=None, height=140):
                                    legend=None)} if color_field else {}),
             tooltip=[x, y],
         )
-        .properties(width="container", height=height)
-        .configure_view(strokeWidth=0, fill="transparent")
+        .properties(width="container", height=height, background="#ffffff" if light else "#0b1018")
+        .configure_view(strokeWidth=0, fill="#ffffff" if light else "transparent")
         .configure_axis(
-            gridColor="rgba(255,255,255,.05)",
-            domainColor="rgba(255,255,255,.08)",
-            tickColor="transparent",
-            labelColor="#8ea8c2",
+            gridColor="#dbe4ef" if light else "rgba(255,255,255,.05)",
+            domainColor="#b9c9d9" if light else "rgba(255,255,255,.08)",
+            tickColor="#b9c9d9" if light else "transparent",
+            labelColor="#405b75" if light else "#8ea8c2",
         )
     )
     return base
@@ -868,13 +873,25 @@ def page_dashboard():
         st.caption("Evolución del riesgo (media 5 min)")
         serie = (df.set_index("timestamp").sort_index()
                    .groupby(pd.Grouper(freq="5min"))["failure_probability"].mean())
-        st.line_chart(serie, color="#38bdf8", height=140)
+        serie_chart = alt.Chart(serie.reset_index(name="risk")).mark_line(
+            color="#087ea4" if current_theme() != "dark" else "#38bdf8"
+        ).encode(
+            x=alt.X("timestamp:T", title=None),
+            y=alt.Y("risk:Q", title=None),
+        ).properties(width="container", height=140, background="#ffffff" if current_theme() != "dark" else "#0b1018")
+        st.altair_chart(serie_chart.configure_view(strokeWidth=0, fill="#ffffff" if current_theme() != "dark" else "transparent").configure_axis(
+            gridColor="#dbe4ef" if current_theme() != "dark" else "rgba(255,255,255,.05)",
+            domainColor="#b9c9d9" if current_theme() != "dark" else "rgba(255,255,255,.08)",
+            tickColor="#b9c9d9" if current_theme() != "dark" else "transparent",
+            labelColor="#405b75" if current_theme() != "dark" else "#8ea8c2",
+        ), use_container_width=True)
 
     c3, c4 = st.columns(2)
     with c3:
         st.caption("Top de máquinas por riesgo")
         top_maq = (df.groupby("machine_id", as_index=False)["failure_probability"]
                      .max().nlargest(10, "failure_probability"))
+        light = current_theme() != "dark"
         ch2 = (
             alt.Chart(top_maq)
             .mark_bar(cornerRadiusEnd=5)
@@ -886,22 +903,27 @@ def page_dashboard():
                                 legend=None),
                 tooltip=["machine_id:N", alt.Tooltip("failure_probability:Q", format=".1%")],
             )
-            .properties(width="container", height=140)
-            .configure_view(strokeWidth=0, fill="transparent")
+            .properties(width="container", height=140, background="#ffffff" if light else "#0b1018")
+            .configure_view(strokeWidth=0, fill="#ffffff" if light else "transparent")
             .configure_axis(
-                gridColor="rgba(255,255,255,.05)",
-                domainColor="rgba(255,255,255,.08)",
-                tickColor="transparent",
-                labelColor="#8ea8c2",
+                gridColor="#dbe4ef" if light else "rgba(255,255,255,.05)",
+                domainColor="#b9c9d9" if light else "rgba(255,255,255,.08)",
+                tickColor="#b9c9d9" if light else "transparent",
+                labelColor="#405b75" if light else "#8ea8c2",
             )
         )
         st.altair_chart(ch2, use_container_width=True)
 
     with c4:
-        st.caption("Distribución de probabilidades")
-        bins = pd.cut(df["failure_probability"], bins=[0,.2,.4,.6,.8,1], include_lowest=True)
-        hdf  = bins.value_counts().sort_index().rename_axis("rango").reset_index(name="n")
-        hdf["rango"] = hdf["rango"].astype(str)
+        st.caption("Predicciones por probabilidad de fallo")
+        rangos = ["0–20%", "20–40%", "40–60%", "60–80%", "80–100%"]
+        bins = pd.cut(
+            df["failure_probability"],
+            bins=[0, .2, .4, .6, .8, 1],
+            labels=rangos,
+            include_lowest=True,
+        )
+        hdf = bins.value_counts().reindex(rangos, fill_value=0).rename_axis("rango").reset_index(name="n")
         ch3 = chart_bar(hdf, "rango:N", "n:Q", color_field="n:Q")
         st.altair_chart(ch3, use_container_width=True)
 
@@ -1028,7 +1050,24 @@ def page_datos():
     m3.metric("Riesgo medio", f"{df['failure_probability'].mean():.1%}")
     st.caption("Evolución del riesgo y volumen de predicciones")
     serie = df.set_index("timestamp").resample("15min")["failure_probability"].agg(["mean", "count"])
-    st.line_chart(serie.rename(columns={"mean": "Riesgo medio", "count": "Predicciones"}), height=180)
+    light = current_theme() != "dark"
+    datos_serie = serie.reset_index().rename(columns={"mean": "risk", "count": "predictions"})
+    base_chart = alt.Chart(datos_serie).encode(x=alt.X("timestamp:T", title=None))
+    volumen = base_chart.mark_bar(color="#b9d7e8" if light else "#24577a", opacity=0.45).encode(
+        y=alt.Y("predictions:Q", title="Predicciones")
+    )
+    riesgo = base_chart.mark_line(color="#087ea4" if light else "#38bdf8", strokeWidth=2.5).encode(
+        y=alt.Y("risk:Q", title="Riesgo medio", axis=alt.Axis(format="%"))
+    )
+    datos_chart = alt.layer(volumen, riesgo).resolve_scale(y="independent").properties(
+        width="container", height=180, background="#ffffff" if light else "#0b1018"
+    ).configure_view(strokeWidth=0).configure_axis(
+        gridColor="#dbe4ef" if light else "rgba(255,255,255,.05)",
+        domainColor="#b9c9d9" if light else "rgba(255,255,255,.08)",
+        labelColor="#405b75" if light else "#8ea8c2",
+        titleColor="#405b75" if light else "#8ea8c2",
+    )
+    st.altair_chart(datos_chart, use_container_width=True)
     st.markdown(f"**Registros** — {len(df):,}")
     df_show = df.copy()
     df_show["failure_predicted"] = df_show["failure_predicted"].map({True: "Sí", False: "No", "true": "Sí", "false": "No"}).fillna(df_show["failure_predicted"].astype(str))
@@ -1061,7 +1100,7 @@ def page_alertas():
             event_id = alerta["event_id"]
             if event_id in enviados:
                 continue
-            nivel = "CRÍTICA" if alerta["alert_level"] == "LARRIA" else "ADVERTENCIA"
+            nivel = alerta["alert_level"]
             mensaje = (
                 f"🚨 CNC Guard · {nivel}\n"
                 f"Máquina: {alerta.get('machine_id', 'N/D')}\n"
@@ -1081,9 +1120,9 @@ def page_alertas():
     criticas = int((df["alert_level"] == "LARRIA").sum())
     advertencias = int((df["alert_level"] == "KONTUZ").sum())
     informativas = int((df["alert_level"] == "OK").sum())
-    nivel = st.radio("", [f"Todas ({len(df)})", f"Críticas ({criticas})", f"Advertencias ({advertencias})", f"Informativas ({informativas})"], horizontal=True, key="alerta_nivel", label_visibility="collapsed")
+    nivel = st.radio("", [f"Todas ({len(df)})", f"LARRIA ({criticas})", f"KONTUZ ({advertencias})", f"OK ({informativas})"], horizontal=True, key="alerta_nivel_codigo", label_visibility="collapsed")
     nivel = nivel.split(" (")[0]
-    nivel_map = {"Todas": None, "Críticas": "LARRIA", "Advertencias": "KONTUZ", "Informativas": "OK"}
+    nivel_map = {"Todas": None, "LARRIA": "LARRIA", "KONTUZ": "KONTUZ", "OK": "OK"}
     if nivel_map[nivel]:
         df = df[df["alert_level"] == nivel_map[nivel]]
     if df.empty:
@@ -1091,7 +1130,7 @@ def page_alertas():
     tabla = df.sort_values("timestamp", ascending=False).copy()
     tabla["Fecha y hora"] = tabla["timestamp"]
     tabla["Máquina"] = tabla["machine_id"]
-    tabla["Tipo"] = tabla["alert_level"].map({"LARRIA": "Crítica", "KONTUZ": "Advertencia", "OK": "Informativa"})
+    tabla["Tipo"] = tabla["alert_level"]
     tabla["Descripción"] = tabla["alert_level"].map({"LARRIA": "Posible fallo crítico · requiere revisión inmediata", "KONTUZ": "Condición anómala · revisar en el próximo mantenimiento", "OK": "Mantenimiento recomendado · sin anomalía crítica"})
     tabla["Valor"] = tabla["failure_probability"].map(lambda value: f"{value:.1%}")
     tabla["Estado"] = "● Activa"
