@@ -36,8 +36,7 @@ def apply_theme() -> None:
     # interfaz legible también cuando el navegador no expone su preferencia.
     if current_theme() == "dark":
         return
-    st.markdown(
-        """
+    light_css = """
         <style>
         .stApp { background: #f4f7fb !important; color: #172033 !important; }
         [data-testid="stSidebar"] { background: #ffffff !important; border-right-color: #dbe4ef !important; box-shadow: 3px 0 20px rgba(30,55,90,.08) !important; }
@@ -89,7 +88,19 @@ def apply_theme() -> None:
         .stFormSubmitButton > button:hover * { color: #fff !important; }
         [data-baseweb="popover"] *, [role="listbox"] *, [role="option"] { color: #263f58 !important; }
         [role="option"][aria-selected="true"] { background: #e5f0fc !important; color: #1769b0 !important; }
+        [data-baseweb="popover"], [data-baseweb="menu"], [role="listbox"] { background: #ffffff !important; border-color: #cbd9e7 !important; }
+        [data-baseweb="popover"] [role="option"], [data-baseweb="menu"] [role="option"], [role="listbox"] [role="option"] { background: #ffffff !important; color: #263f58 !important; }
+        [data-baseweb="popover"] [role="option"] *, [data-baseweb="menu"] [role="option"] *, [role="listbox"] [role="option"] * { color: #263f58 !important; }
+        [data-baseweb="popover"] [role="option"]:hover, [data-baseweb="menu"] [role="option"]:hover, [role="listbox"] [role="option"]:hover { background: #edf4fb !important; color: #1769b0 !important; }
+        [data-baseweb="popover"] [role="option"][aria-selected="true"], [data-baseweb="menu"] [role="option"][aria-selected="true"] { background: #e5f0fc !important; color: #1769b0 !important; }
+        [data-baseweb="menu"] li, [data-baseweb="popover"] li { background: #ffffff !important; color: #263f58 !important; }
+        [data-baseweb="menu"] li:hover, [data-baseweb="popover"] li:hover { background: #edf4fb !important; color: #1769b0 !important; }
         </style>
-        """,
-        unsafe_allow_html=True,
-    )
+        """
+    if current_theme() == "automatic":
+        light_css = light_css.replace(
+            "<style>",
+            "<style>@media (prefers-color-scheme: light) {",
+            1,
+        ).replace("</style>", "}</style>", 1)
+    st.markdown(light_css, unsafe_allow_html=True)
