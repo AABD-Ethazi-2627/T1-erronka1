@@ -1,145 +1,116 @@
-# Documentación de la aplicación Streamlit
+# Streamlit dokumentazioa
 
-## 1. Descripción
+## 1. Deskribapena
 
-La aplicación Streamlit proporciona el panel web de **CNC Guard**, una
-plataforma de mantenimiento predictivo para máquinas CNC.
+Streamlit aplikazioak **CNC Guard** sistemaren web-panela eskaintzen du.
+Panelaren bidez CNC makinen mantentze prediktiboa monitoriza daiteke.
 
-Desde el panel se puede:
+Aplikazioak aukera hauek eskaintzen ditu:
 
-- Consultar el estado de la API de predicciones.
-- Consultar el estado de Elasticsearch.
-- Visualizar métricas de disponibilidad y riesgo.
-- Explorar predicciones históricas.
-- Ejecutar predicciones manuales.
-- Consultar y filtrar alertas de mantenimiento.
-- Cambiar el tema visual y configurar la actualización automática.
+- Scoring APIaren egoera kontsultatzea.
+- Elasticsearch-en egoera kontsultatzea.
+- Metrikak, arriskuak eta alertak bistaratzea.
+- Aurreikuspen historikoak aztertzea.
+- Eskuzko aurreikuspenak egitea.
+- Alertak makina, aldi eta mailaren arabera iragaztea.
+- Gai bisuala eta eguneratze automatikoa konfiguratzea.
 
-El punto de entrada es `app.py`.
-
-## 2. Estructura del proyecto
+## 2. Karpeta-egitura
 
 ```text
 streamlit/
-├── app.py                    # Entrada de la aplicación
-├── config.py                 # Variables de entorno y constantes
-├── core/                     # Arranque y navegación
-│   └── application.py
-├── views/                    # Pantallas de la aplicación
+├── app.py                    # Aplikazioaren sarrera-puntua
+├── config.py                 # Ingurune-aldagaiak eta konstanteak
+├── core/application.py       # Abiaraztea eta nabigazioa
+├── views/                    # Aplikazioaren pantailak
 │   ├── dashboard.py
 │   ├── predicciones.py
 │   ├── datos.py
 │   └── alertas.py
-├── services/                 # Integraciones y datos
+├── services/                 # APIak eta datuen tratamendua
 │   ├── scoring.py
 │   ├── elasticsearch.py
 │   ├── data.py
 │   ├── http.py
 │   └── exceptions.py
-├── ui/                       # Tema, CSS, iconos y gráficos
+├── ui/                       # Estiloak, gaiak eta grafikoak
 │   ├── charts.py
 │   ├── icons.py
 │   ├── theme.py
 │   └── styles.css
 ├── Dockerfile
-├── requirements.txt
-└── .dockerignore
+└── requirements.txt
 ```
 
-`views` se utiliza en lugar de `pages` porque `pages` es un nombre reservado
-por el sistema multipágina automático de Streamlit.
+`views` karpeta erabiltzen da `pages` izenaren ordez, azken hori Streamlit-en
+orrialde anitzeko sistemarentzat erreserbatuta dagoelako.
 
-| Módulo | Responsabilidad |
-|---|---|
-| `app.py` | Punto de entrada estable para Docker y Streamlit. |
-| `core/` | Configuración, navegación y ciclo de ejecución. |
-| `views/` | Interfaz y flujo de usuario de cada pantalla. |
-| `services/` | API de scoring, Elasticsearch y transformación de datos. |
-| `ui/` | Tema, estilos, iconos y gráficos reutilizables. |
-| `config.py` | Configuración basada en variables de entorno. |
+## 3. Exekuzioa lokalean
 
-## 3. Requisitos
-
-- Python 3.10 o superior.
-- Streamlit 1.40.2.
-- API de scoring disponible.
-- Elasticsearch disponible para consultar datos históricos.
-
-Las dependencias están fijadas en `requirements.txt`.
-
-## 4. Ejecución local
-
-Desde la carpeta `streamlit/`:
+`streamlit/` karpetan:
 
 ```bash
 python -m venv .venv
 ```
 
-Activación en Windows PowerShell:
+Windows PowerShell-en ingurunea aktibatzeko:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-Instalación y arranque:
+Menpekotasunak instalatu eta aplikazioa abiarazteko:
 
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-La aplicación estará disponible en `http://localhost:8501`.
+Aplikazioa `http://localhost:8501` helbidean egongo da erabilgarri.
 
-## 5. Ejecución con Docker Compose
+## 4. Docker bidezko exekuzioa
 
-Desde la raíz del proyecto:
+Proiektuaren erro-karpetatik:
 
 ```bash
 docker compose up -d --build streamlit
 ```
 
-Comprobar el estado:
+Egoera eta logak ikusteko:
 
 ```bash
 docker compose ps streamlit
-```
-
-Consultar logs:
-
-```bash
 docker logs cnc-streamlit --tail 100
 ```
 
-El servicio expone el puerto `8501` y utiliza este healthcheck:
+Streamlit-en healthcheck-a:
 
 ```text
 http://localhost:8501/_stcore/health
 ```
 
-## 6. Configuración
+## 5. Konfigurazioa
 
-La aplicación utiliza las siguientes variables de entorno:
-
-| Variable | Valor predeterminado | Descripción |
+| Aldagaia | Balio lehenetsia | Deskribapena |
 |---|---|---|
-| `API_URL` | `http://scoring-api:8000` | URL de la API de scoring. |
-| `API_USERNAME` | `nifi` | Usuario de autenticación. |
-| `API_PASSWORD` | vacío | Contraseña de autenticación. |
-| `ES_URL` | `http://elasticsearch:9200` | URL de Elasticsearch. |
-| `ES_INDEX` | `cnc-predictions` | Índice de predicciones. |
+| `API_URL` | `http://scoring-api:8000` | Scoring APIaren URLa. |
+| `API_USERNAME` | `nifi` | APIko erabiltzailea. |
+| `API_PASSWORD` | hutsik | APIko pasahitza. |
+| `ES_URL` | `http://elasticsearch:9200` | Elasticsearch-en URLa. |
+| `ES_INDEX` | `cnc-predictions` | Kontsultatutako indizea. |
 
-Ejemplo para PowerShell:
+PowerShell-eko adibidea:
 
 ```powershell
 $env:API_URL = "http://localhost:8000"
 $env:API_USERNAME = "nifi"
-$env:API_PASSWORD = "tu contraseña"
+$env:API_PASSWORD = "zure pasahitza"
 $env:ES_URL = "http://localhost:9200"
 $env:ES_INDEX = "cnc-predictions"
 streamlit run app.py
 ```
 
-## 7. Flujo de ejecución
+## 6. Exekuzio-fluxua
 
 ```text
 app.py
@@ -150,110 +121,102 @@ configure_app()
   ↓
 render_sidebar()
   ↓
-views.<pantalla>.render()
+views.<pantaila>.render()
   ↓
-services y ui
+services eta ui
 ```
 
-`app.py` no contiene lógica de negocio. Solo importa y ejecuta `main()`.
+`app.py` fitxategiak sarrera-puntu gisa bakarrik funtzionatzen du. Aplikazioaren
+logika `core`, `views`, `services` eta `ui` geruzetan banatuta dago.
 
-## 8. Pantallas
+## 7. Pantailak
 
-### Dashboard
+### Dashboard-a
 
-Implementado en `views/dashboard.py`. Muestra:
+`views/dashboard.py` fitxategiak honako hauek erakusten ditu:
 
-- Máquinas detectadas.
-- Disponibilidad estimada.
-- Alertas activas.
-- MTBF calculado con el histórico disponible.
-- Distribución de niveles de alerta.
-- Evolución del riesgo.
-- Máquinas con mayor probabilidad de fallo.
+- Makina kopurua.
+- Erabilgarritasuna.
+- Alerta aktiboak.
+- MTBFa.
+- Alerta-mailen banaketa.
+- Arriskuaren bilakaera.
+- Arrisku handiena duten makinak.
 
-Los datos se obtienen de Elasticsearch mediante
-`services.elasticsearch.dashboard_documents()`.
+Datuak Elasticsearch-etik lortzen dira.
 
-### Predicciones
+### Aurreikuspenak
 
-Implementado en `views/predicciones.py`. Permite enviar a la API:
+`views/predicciones.py` fitxategiak eskuzko aurreikuspenak egiteko formularioa
+eskaintzen du. Makinaren identifikatzailea, karga mota, tenperaturak, RPMa,
+motor-momentua eta erremintaren higadura erabiltzen ditu.
 
-- Identificador de máquina.
-- Tipo de carga.
-- Temperatura del aire.
-- Temperatura del proceso.
-- Revoluciones por minuto.
-- Par motor.
-- Desgaste de herramienta.
+Aurreikuspena `services.scoring.predict()` funtzioaren bidez bidaltzen da.
 
-La comunicación se realiza mediante `services.scoring.predict()`.
+### Datuak
 
-### Datos
+`views/datos.py` fitxategiak datu historikoak iragazteko aukera ematen du:
 
-Implementado en `views/datos.py`. Permite filtrar por nivel de alerta, número
-de registros e identificador de máquina. Los resultados se convierten a un
-`pandas.DataFrame` mediante `services.data.load_predictions()`.
+- Alerta-maila.
+- Erregistro kopurua.
+- Makina.
 
-### Alertas
+Emaitzak `pandas.DataFrame` batean normalizatzen dira.
 
-Implementado en `views/alertas.py`. Permite filtrar por máquina, periodo y
-nivel de alerta. Los niveles disponibles son `OK`, `KONTUZ` y `LARRIA`.
+### Alertak
 
-## 9. Servicios externos
+`views/alertas.py` fitxategiak alertak makina, denbora-tarte eta mailaren arabera
+iragazten ditu. Alerta-mailak hauek dira: `OK`, `KONTUZ` eta `LARRIA`.
 
-### API de scoring
+## 8. Zerbitzuak
 
-`services/scoring.py` se encarga de:
+### Scoring APIa
 
-1. Solicitar tokens en `/auth/token`.
-2. Guardar el token temporalmente en `st.session_state`.
-3. Reutilizar el token mientras siga siendo válido.
-4. Reintentar una predicción si la API responde con `401`.
-5. Comprobar el estado de la API mediante `/health`.
+`services/scoring.py` moduluak:
+
+1. `/auth/token` endpoint-ean tokena eskatzen du.
+2. Tokena Streamlit-en saioan gordetzen du.
+3. Tokena iraungi arte berrerabiltzen du.
+4. `401` errore baten ondoren eskaera berriro saiatzen du.
+5. APIaren egoera `/health` endpoint-aren bidez egiaztatzen du.
 
 ### Elasticsearch
 
-`services/elasticsearch.py` se encarga de ejecutar búsquedas, consultar
-conteos, cargar datos del dashboard y gestionar las cachés de Streamlit.
+`services/elasticsearch.py` moduluak bilaketak, kontagailuak, dashboard-eko
+datuak eta Streamlit-en cache-ak kudeatzen ditu.
 
-Las excepciones específicas se definen en `services/exceptions.py`:
+Salbuespen nagusiak `services/exceptions.py` fitxategian daude:
 
-- `ElasticsearchUnavailable`: el servicio no responde.
-- `ElasticsearchIndexMissing`: el índice todavía no existe.
+- `ElasticsearchUnavailable`: zerbitzua ez dago erabilgarri.
+- `ElasticsearchIndexMissing`: konfiguratutako indizea ez da existitzen.
 
-## 10. Caché y actualización
+## 9. Cache-a eta eguneratze automatikoa
 
-Las consultas utilizan `st.cache_data` para evitar peticiones innecesarias:
+`st.cache_data` erabiltzen da eskaera errepikatuak murrizteko:
 
-- Estado de la API: 10 segundos.
-- Conteos de Elasticsearch: 15 segundos.
-- Documentos y dashboard: 10 segundos.
+- APIaren egoera: 10 segundo.
+- Elasticsearch-eko kontagailuak: 15 segundo.
+- Dokumentuak eta dashboard-a: 10 segundo.
 
-Los botones de actualización manual llaman a
-`services.elasticsearch.clear_cache()` y fuerzan un nuevo renderizado.
+Eguneratze-botoiek cache-a garbitu eta aplikazioa berriro errendatzen dute.
+Alboko barratik eguneratze automatikoa aktiba daiteke edo desaktibatuta utzi.
 
-La barra lateral permite actualizar automáticamente cada 30 segundos, 1, 10 o
-30 minutos, 1 hora, o desactivar la actualización.
+## 10. Estiloak eta gai bisuala
 
-## 11. Estilos y gráficos
+Estilo globalak `ui/styles.css` fitxategian daude. Aplikazioak fitxategi hori
+`<style>...</style>` etiketen barruan kargatzen du.
 
-Los estilos globales se encuentran en `ui/styles.css` y se cargan dentro de
-una etiqueta `<style>` desde `core/application.py`.
+`ui/theme.py` moduluak gai argia, iluna eta automatikoa kudeatzen ditu.
+Grafikoen estilo partekatuak `ui/charts.py` moduluan daude.
 
-El tema visual está gestionado por `ui/theme.py` y se conserva en
-`st.session_state`.
+## 11. Pantaila berri bat gehitzea
 
-Los gráficos compartidos están definidos en `ui/charts.py`, que centraliza
-colores, fondos, ejes y estilos para los modos claro y oscuro.
+1. Sortu modulua `views/` karpetan.
+2. Definitu `render()` funtzioa.
+3. Inportatu modulua `core/application.py` fitxategian.
+4. Gehitu pantaila `PAGES` hiztegian.
 
-## 12. Añadir una nueva pantalla
-
-1. Crear un archivo en `views/`, por ejemplo `mantenimiento.py`.
-2. Definir una función pública `render()`.
-3. Importar el módulo en `core/application.py`.
-4. Añadirlo al diccionario `PAGES`.
-
-Ejemplo:
+Adibidea:
 
 ```python
 # views/mantenimiento.py
@@ -261,67 +224,56 @@ import streamlit as st
 
 
 def render() -> None:
-    st.title("Mantenimiento")
+    st.title("Mantentzea")
 ```
 
-Registro:
+## 12. Jardunbide egokiak
 
-```python
-from views import mantenimiento
+- Ez egin HTTP eskaerarik zuzenean views-etatik.
+- Mantendu kanpoko integrazioak `services/` karpetan.
+- Ez gorde pasahitzik iturburu-kodean.
+- Erabili ingurune-aldagaiak kredentzialetarako.
+- Berrerabili `ui/`-ko osagaiak.
+- Mantendu `render()` funtzio bat pantaila bakoitzeko.
+- Garbitu cache-ak datuetan aldaketak egin ondoren.
+- Exekutatu `git diff --check` commit bat egin aurretik.
 
-PAGES = {
-    "Mantenimiento": mantenimiento.render,
-}
-```
+## 13. Ohiko arazoak
 
-## 13. Buenas prácticas
+### APIa Offline agertzen da
 
-- No realizar peticiones HTTP directamente desde las vistas.
-- Mantener las consultas a Elasticsearch dentro de `services/`.
-- No guardar secretos en el código fuente.
-- Usar variables de entorno para las credenciales.
-- Reutilizar componentes de `ui/` antes de crear estilos nuevos.
-- Mantener una función `render()` por vista.
-- Limpiar las cachés después de cambios manuales en los datos.
-- Ejecutar `git diff --check` antes de hacer commit.
-- Reconstruir Docker después de cambiar dependencias o archivos copiados.
+Egiaztatu `scoring-api` zerbitzua abian dagoela, `API_URL` zuzena dela eta
+kredentzialak konfiguratuta daudela.
 
-## 14. Problemas frecuentes
+### Elasticsearch Offline agertzen da
 
-### La API aparece como Offline
+Egiaztatu Elasticsearch abian dagoela, `ES_URL` zuzena dela eta Docker sarean
+Streamlit edukiontzitik eskuragarri dagoela.
 
-Comprobar que `scoring-api` está arrancado, que `API_URL` es correcto y que las
-credenciales están configuradas.
+### Ez da daturik agertzen
 
-### Elasticsearch aparece como Offline
+Egiaztatu NiFi-ren fluxua aktibo dagoela eta datuak `cnc-predictions` indizera
+bidaltzen dituela.
 
-Comprobar que Elasticsearch está arrancado, que `ES_URL` es correcto y que el
-contenedor Streamlit puede acceder a él por la red Docker.
+### Interfazea estilo gabe agertzen da
 
-### No aparecen datos
-
-El índice puede existir pero estar vacío. Comprobar que el flujo de NiFi está
-activo y que está enviando documentos a `cnc-predictions`.
-
-### La interfaz aparece sin estilos
-
-Comprobar que `ui/styles.css` existe y que se carga dentro de
-`<style>...</style>`. Después reconstruir el contenedor:
+Egiaztatu `ui/styles.css` fitxategia existitzen dela eta `<style>...</style>`
+barruan kargatzen dela. Ondoren berreraiki zerbitzua:
 
 ```bash
 docker compose up -d --build streamlit
 ```
 
-## 15. Comprobaciones antes de entregar cambios
+## 14. Egiaztapenak
 
-Desde la raíz del proyecto:
+Proiektuaren erro-karpetatik:
 
 ```bash
 git diff --check
 docker compose config --quiet
 ```
 
-Si Docker está iniciado:
+Docker abian badago:
 
 ```bash
 docker compose up -d --build streamlit
