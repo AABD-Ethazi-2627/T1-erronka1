@@ -68,3 +68,24 @@ Errore kopurua bakarrik kontuan hartuko bagenu, 0,4ko atalasea hobea dela pentsa
 ### Zergatik 0,15 eta ez kostu txikieneko balio zehatza?
 
 Gure kalkuluetan, kosturik txikiena 0,16ko atalasean lortzen da (54.200 €). Hala ere, balio hori baliozkotze-datu zehatzetara gehiegi egokituta egon daiteke. 0,10 eta 0,16 arteko atalaseek antzeko kostuak dituzte (54.000–58.000 €). Horregatik, 0,15eko atalasea aukeratu dugu, aukera egokia eta zuhurra delako, balio zehatz bakar baten menpe egon gabe.
+
+## Zergatik ihes egiten duten 6 akatsek 0.15eko atalasearekin
+Ereduak bero-, potentzia- eta gainesfortzu-akats guztiak detektatzen ditu; ihes egiten diren 6 akatsetatik, 5 erremintaren higadurarenak dira (TWF).
+
+| Hutsegite mota | Hutsegiteak baliozkotzean | 0,4 atalasearekin detektatu gabeak | 0,15 atalasearekin detektatu gabeak |
+|---|---:|---:|---:|
+| Beroa (HDF) | 10 | 0 | 0 |
+| Potentzia (PWF) | 20 | 0 | 0 |
+| Gainesfortzua (OSF) | 19 | 0 | 0 |
+| Erremintaren higadura (TWF) | 11 | 9 | 5 |
+| Mota ezezaguna | 1 | 1 | 1 |
+
+Makina batzuek hainbat hutsegite mota izan ditzakete aldi berean; horregatik, hutsegiteen zutabeko baturak 54 baino gehiago ematen du.
+
+- **0,15eko atalasearen abantaila:** 0,4ko atalasearekin detektatu gabe geratzen ziren TWF motako 4 hutsegite berreskuratzen ditu. Ereduak 0,17 eta 0,23 arteko probabilitateak ematen dizkie.
+
+- **Zergatik ez diren gainerako TWF hutsegiteak detektatzen:** erreminta erabilerako 200 eta 240 minutu artean ausaz apurtzen da, eta higadura-maila bera duten makina osasuntsu asko daude. Sentsoreek ezin dituzte egoera horiek bereizi.
+
+- **Geratzen diren 6 hutsegiteak:** 0,00 eta 0,12 arteko probabilitateak dituzte. Horiek detektatzeko, ia makina guztiei alarma eman beharko litzaieke, eta horrek aurreztutakoa baino gehiago kostatuko luke.
+
+- **TWF motako hutsegiteetarako benetako irtenbidea:** mantentze-lan prebentiboak egitea eta erreminta erabilerako 200 minutu bete aurretik aldatzea.
