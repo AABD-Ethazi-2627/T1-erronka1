@@ -1,6 +1,17 @@
-# docker-compose.yml — IKASLE VM-ERAKO
-# Simuladorea ZERBITZARI NAGUSIAN dago; honetatik NFS bidez irakurtzen du Filebeat-ek.
-# Abiatzeko: docker compose up -d --build
+# docker-compose.prod.yml — PRODUKZIOA (IKASLE VM / zerbitzaria)
+# Simuladorea ZERBITZARI NAGUSIAN dago; Samba (CIFS) bidez irakurtzen du Filebeat-ek.
+# Garapenerako: docker-compose.dev.yml
+# Abiatzeko: docker compose -f docker-compose.prod.yml up -d --build
+#
+# Produkziorako desberdintasunak: restart: always, log errotazioa, memoria mugak,
+# barne-zerbitzuak (Kafka, ES, Kibana, NiFi) 127.0.0.1-ean soilik, kode-bolumenik gabe.
+name: cnc-guard-prod
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 networks:
   cnc-net:
@@ -27,16 +38,14 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: cnc-kafka
-    ports:
-      - "29092:29092"   # Host lokaletik sartzeko (Python script-ak: localhost:29092)
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
       # Docker sare barnean: kafka:9092 (Filebeat, NiFi)
-      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092'
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -53,7 +62,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
+    mem_limit: 1g
+    restart: always
+    logging: *default-logging
     networks:
       - cnc-net
 
@@ -70,7 +81,8 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-    restart: unless-stopped
+    restart: always
+    logging: *default-logging
     networks:
       - cnc-net
 
@@ -85,7 +97,7 @@ services:
       - -c
       - sed -i 's|^nifi.web.https.application.protocols=.*|nifi.web.https.application.protocols=http/1.1|' conf/nifi.properties && exec ../scripts/start.sh
     ports:
-      - "8443:8443"   # HTTPS Web Interfazea
+      - "127.0.0.1:8443:8443"   # HTTPS Web Interfazea (SSH tunela edo reverse proxy bidez)
     environment:
       NIFI_WEB_HTTPS_PORT: 8443
       SINGLE_USER_CREDENTIALS_USERNAME: ${NIFI_USERNAME:-admin}
@@ -97,7 +109,9 @@ services:
         condition: service_healthy
       scoring-api:
         condition: service_started   # /health 3. fasean inplementatzen da
-    restart: unless-stopped
+    mem_limit: 2g
+    restart: always
+    logging: *default-logging
     networks:
       - cnc-net
 
@@ -113,10 +127,10 @@ services:
       - "elasticsearch:127.0.0.1"
     environment:
       - discovery.type=single-node
-      - xpack.security.enabled=false   # Desaktibatuta tokiko ingurunea errazteko
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false   # Desaktibatuta: ES ez da kanpora ireki behar (127.0.0.1)
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
     ports:
-      - "9200:9200"
+      - "127.0.0.1:9200:9200"   # Segurtasunik gabe: ez ireki kanpora
     volumes:
       - es-data:/usr/share/elasticsearch/data
     healthcheck:
@@ -124,7 +138,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
+    mem_limit: 2g
+    restart: always
+    logging: *default-logging
     networks:
       - cnc-net
 
@@ -133,13 +149,15 @@ services:
     image: docker.elastic.co/kibana/kibana:8.10.2
     container_name: cnc-kibana
     ports:
-      - "5601:5601"
+      - "127.0.0.1:5601:5601"
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     depends_on:
       elasticsearch:
         condition: service_healthy
-    restart: unless-stopped
+    mem_limit: 1g
+    restart: always
+    logging: *default-logging
     networks:
       - cnc-net
 
@@ -166,7 +184,9 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-    restart: unless-stopped
+    mem_limit: 1g
+    restart: always
+    logging: *default-logging
     networks:
       - cnc-net
 
@@ -193,7 +213,9 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-    restart: unless-stopped
+    mem_limit: 512m
+    restart: always
+    logging: *default-logging
     networks:
       - cnc-net
 
@@ -214,6 +236,8 @@ services:
     depends_on:
       elasticsearch:
         condition: service_healthy
-    restart: unless-stopped
+    mem_limit: 128m
+    restart: always
+    logging: *default-logging
     networks:
       - cnc-net
