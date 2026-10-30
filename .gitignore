@@ -10,3 +10,4 @@ models/backups/
 .venv/
 .pytest_cache/
 data/stream/*.csv
+.claude/settings.local.json
