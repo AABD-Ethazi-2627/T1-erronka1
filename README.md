@@ -277,3 +277,16 @@ cnc-guard/
 ## 11. Erronkaren dokumentua
 
 `ENUNTZIATUA.md` irakurri — hiru faseetan zer egin azaltzen du.
+
+
+## MCP eta skills (Claude Code)
+
+`mcp-server/` Claude Code-ri CNC Guard kontsultatzeko tresnak ematen dizkion MCP zerbitzaria da (irakurketa soilik): `model_health`, `predict_failure`, `get_machine_status`, `list_active_alerts`.
+
+```bash
+cd mcp-server && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python -m pytest tests      # probak
+```
+
+- `.mcp.json`-ek zerbitzaria automatikoki abiarazten du Claude Code-ren bidez. `API_PASSWORD` `.env`-tik irakurtzen da; `API_URL`/`ES_URL` lehenetsiak `localhost:8000`/`localhost:9200` dira (stack-a Dockerrean martxan egon behar da).
+- `.claude/skills/`: `diagnose-machine`, `retrain-model`, `stack-troubleshooting` — Claude-k automatikoki kargatzen ditu lanari dagokionean.
