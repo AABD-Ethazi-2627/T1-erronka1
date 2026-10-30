@@ -287,14 +287,64 @@ cnc-guard/
 `ENUNTZIATUA.md` irakurri — hiru faseetan zer egin azaltzen du.
 
 
-## MCP eta skills (Claude Code)
+## 12. MCP eta skills (Claude Code)
 
-`mcp-server/` Claude Code-ri CNC Guard kontsultatzeko tresnak ematen dizkion MCP zerbitzaria da (irakurketa soilik): `model_health`, `predict_failure`, `get_machine_status`, `list_active_alerts`.
+CNC Guard Claude Code-rekin kontsultatu daiteke hizkuntza naturalean. Bi pieza daude: **MCP zerbitzaria** (datuak irakurtzeko tresnak) eta **skills** (Claude-k nola arrazoitu behar duen azaltzen duten jarraibideak).
+
+### 12.1 Instalazioa (behin bakarrik)
 
 ```bash
 cd mcp-server && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest tests      # probak
+.venv/bin/python -m pytest tests      # probak (6 pasa behar dira)
 ```
 
-- `.mcp.json`-ek zerbitzaria automatikoki abiarazten du Claude Code-ren bidez. `API_PASSWORD` `.env`-tik irakurtzen da; `API_URL`/`ES_URL` lehenetsiak `localhost:8000`/`localhost:9200` dira (stack-a Dockerrean martxan egon behar da).
-- `.claude/skills/`: `diagnose-machine`, `retrain-model`, `stack-troubleshooting` — Claude-k automatikoki kargatzen ditu lanari dagokionean.
+1. Stack-a martxan egon behar da (`docker compose ps`): MCP-k `localhost:8000` (API) eta `localhost:9200` (Elasticsearch) erabiltzen ditu. `API_PASSWORD` `.env`-tik irakurtzen da.
+2. Ireki Claude Code proiektuaren erroan (`T1-erronka1/`) eta onartu `cnc-guard` zerbitzaria (`.mcp.json`-ek definitzen du). Ez bada agertzen, berrabiarazi Claude Code / birkargatu VS Code leihoa eta ireki txat berri bat.
+3. Egiaztatu: `claude mcp list` → `cnc-guard ... ✔ Connected` (edo `/mcp` txatean, `project` taldean).
+
+### 12.2 MCP tresnak
+
+Ez dira eskuz deitzen: Claude-ri galdetu eta berak aukeratzen du tresna egokia. Guztiak irakurketa/kalkulu soilekoak dira, ez dute ezer aldatzen.
+
+| Tresna | Zertarako | Galdera-adibidea |
+|---|---|---|
+| `model_health` | Scoring API-a eta modeloa kargatuta dauden egiaztatu | "Modeloa kargatuta dago?" |
+| `list_active_alerts` | Azken minutuetako alertak (`KONTUZ`/`LARRIA`) | "Makinaren bat arriskuan dago?" |
+| `get_machine_status` | Makina baten azken iragarpenak eta joera | "Zer moduz dago CNC-039?" |
+| `predict_failure` | Sentsore-balio hipotetikoekin probabilitatea kalkulatu (ez du ezer gordetzen) | "Zer probabilitate izango luke M motako makina batek 2800 rpm, 60 Nm eta 220 min higadurarekin?" |
+
+Alerta mailak: `OK` (≤ 0.5), `KONTUZ` (0.5–0.8), `LARRIA` (> 0.8).
+
+### 12.3 Skills
+
+`.claude/skills/`-en daude eta Claude-k automatikoki aktibatzen ditu galderak bat datorrenean (ez da komandorik idatzi behar). Behartzeko: `/diagnose-machine`, `/retrain-model` edo `/stack-troubleshooting`.
+
+| Skill | Noiz aktibatzen da | Galdera-adibideak |
+|---|---|---|
+| `diagnose-machine` | Makina baten egoera, arriskua edo alertak | "Makinaren bat arriskuan dago?", "Diagnostikatu CNC-039", "Zergatik dago CNC-012 alertan?" |
+| `stack-troubleshooting` | Datuak ez dira iristen edo edukiontzi bat huts egiten du | "Ez dira datuak iristen", "Dashboard-a hutsik dago", "Ez dago alertarik" |
+| `retrain-model` | Modeloa berrentrenatu, hobetu edo ordezkatu | "Berrentrenatu modeloa", "Iragarpenak arraroak dira" |
+
+`diagnose-machine`-ek honela jokatzen du: `model_health` → alertak/egoera kontsultatu → **joera** aztertu (ez soilik azken balioa) → kausa probableak (TWF, HDF, PWF, OSF, RNF, **hipotesi gisa**) → gomendatutako ekintza. Modeloa `down` badago, `stack-troubleshooting`-era pasatzen da.
+
+### 12.4 Beste agenteak (Codex, Cursor...)
+
+Konfigurazioa ez da Claude Code-rentzat bakarrik:
+
+| Fitxategia | Zertarako |
+|---|---|
+| `AGENTS.md` | Agente guztientzako testuingurua (Codex, Cursor, Copilot...); `CLAUDE.md`-k inportatzen du |
+| `.agents/skills/` | `.claude/skills/`-en esteka sinbolikoa: skill berak, kopiarik gabe |
+| `.codex/config.toml` | `cnc-guard` MCP-a Codex-entzat (Codex proiektuaren erroan exekutatu) |
+| `.mcp.json` | `cnc-guard` MCP-a Claude Code-rentzat |
+
+Beste MCP bezero batek: komandoa `mcp-server/.venv/bin/python mcp-server/server.py` (stdio), `API_URL` eta `ES_URL` ingurune-aldagaiekin.
+
+### 12.5 Arazoak
+
+| Sintoma | Konponbidea |
+|---|---|
+| `cnc-guard` ez da `/mcp`-n agertzen | Birkargatu leihoa eta ireki txat berri bat (zerbitzariak txata hasten denean kargatzen dira) |
+| `Pending approval` | Onartu `/mcp`-tik edo gehitu `.claude/settings.local.json`-en `{"enabledMcpjsonServers": ["cnc-guard"]}` |
+| Tresnek errorea ematen dute | Egiaztatu `docker compose ps`, `curl localhost:8000/health` eta `API_PASSWORD` `.env`-n |
+| `found: false` makina batean | ID formatua `CNC-039` izan behar da; baliozkoa bada, pipeline-a geldituta egon daiteke |
