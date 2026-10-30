@@ -20,7 +20,7 @@ Simuladorea (Samba)
 
 ## 2. Konfigurazioa (`.env`)
 
-Sekretuak ez daude `docker-compose.yml`-n, `.env` fitxategian baizik (`.gitignore`-n dago, ez da git-era igotzen).
+Sekretuak ez daude `docker-compose.*.yml`-n, `.env` fitxategian baizik (`.gitignore`-n dago, ez da git-era igotzen).
 
 1. Txantiloia kopiatu:
 
@@ -60,7 +60,15 @@ Pasahitzak eta `JWT_SECRET` derrigorrezkoak dira: falta bada, `docker compose` e
 
 ## 3. Zerbitzuak abiarazi
 
+Bi konfigurazio daude:
+
+| Fitxategia | Erabilera |
+|---|---|
+| `docker-compose.dev.yml` | Garapena: CSV-ak `./data/stream/`-etik (Samba gabe), kodea muntatuta + hot-reload, portu guztiak irekita |
+| `docker-compose.prod.yml` | Produkzioa: Samba (CIFS), `restart: always`, log errotazioa, memoria mugak, barne-zerbitzuak `127.0.0.1`-ean |
+
 ```bash
+export COMPOSE_FILE=docker-compose.prod.yml   # edo docker-compose.dev.yml (-f erabili ordez)
 docker compose up -d --build
 docker compose ps
 ```
