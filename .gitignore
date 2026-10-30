@@ -9,3 +9,4 @@ models/backups/
 *.pkl.tmp
 .venv/
 .pytest_cache/
+data/stream/*.csv

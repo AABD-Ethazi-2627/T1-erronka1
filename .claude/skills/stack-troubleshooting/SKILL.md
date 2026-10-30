@@ -12,7 +12,7 @@ Flujo: Samba (CSV) → Filebeat → Kafka `cnc-sensors-raw` → NiFi → (Scorin
 | # | Capa | Comprobación |
 |---|---|---|
 | 0 | Contenedores | `docker compose ps` (¿healthy?) |
-| 1 | Samba / volumen | `docker compose exec filebeat ls /ruta-del-volumen` ; ver `cnc-stream` en `docker-compose.yml` |
+| 1 | Samba / volumen | `docker compose exec filebeat ls /ruta-del-volumen` ; ver `cnc-stream` en `docker-compose.prod.yml` |
 | 2 | Filebeat | `docker compose logs --tail 50 filebeat` |
 | 3 | Kafka | `docker compose exec kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic cnc-sensors-raw --max-messages 3 --timeout-ms 5000` |
 | 4 | NiFi | UI https://localhost:8443: colas con datos atascados, procesadores en rojo; flujos en `nifi-flows/` |
@@ -20,10 +20,10 @@ Flujo: Samba (CSV) → Filebeat → Kafka `cnc-sensors-raw` → NiFi → (Scorin
 | 6 | Elasticsearch | `curl localhost:9200/_cat/indices?v` y `_count` de `cnc-sensors` y `cnc-predictions` |
 | 7 | Kibana/Streamlit/Telegram | `docker compose logs --tail 50 <servicio>` |
 
-Ajusta nombres de servicio con `docker compose config --services` si no coinciden.
+Usa `-f docker-compose.dev.yml` o `-f docker-compose.prod.yml` (o `COMPOSE_FILE`) según el entorno. Ajusta nombres de servicio con `docker compose config --services` si no coinciden.
 
 ## Fallos típicos
-- **Volumen CIFS/Samba desactualizado**: Filebeat no ve CSV nuevos. Los últimos commits ajustan las opciones de caché CIFS de `cnc-stream`; revisa `docker-compose.yml` y que `SMB_IP`/credenciales de `.env` sean correctos.
+- **Volumen CIFS/Samba desactualizado**: Filebeat no ve CSV nuevos. Los últimos commits ajustan las opciones de caché CIFS de `cnc-stream`; revisa `docker-compose.prod.yml` y que `SMB_IP`/credenciales de `.env` sean correctos.
 - **403/401 en `/predict`**: token JWT caducado (5 min) o `API_PASSWORD` distinta entre `.env` y la configuración OAuth2 de NiFi.
 - **`model_loaded: false`**: falta `models/cnc_failure_model.pkl` o versión de sklearn incompatible → skill `retrain-model`.
 - **`cnc-sensors` crece pero `cnc-predictions` no**: el fallo está en NiFi→Scoring (rama de predicción), no en la ingesta.

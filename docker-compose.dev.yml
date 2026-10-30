@@ -1,0 +1,206 @@
+# docker-compose.dev.yml — GARAPENA (tokiko makina)
+# Samba gabe: simuladorearen CSV-ak ./data/stream/ karpetan jarri (Filebeat-ek hortik irakurtzen du).
+# Kodea bolumen bidez muntatuta dago eta hot-reload aktibo dago (scoring-api, streamlit).
+# Produkziorako: docker-compose.prod.yml
+# Abiatzeko: docker compose -f docker-compose.dev.yml up -d --build
+name: cnc-guard-dev
+
+networks:
+  cnc-net:
+    driver: bridge
+
+volumes:
+  kafka-data:      # Kafka log-en iraunkortasuna
+  nifi-data:       # NiFi flow-en iraunkortasuna
+  filebeat-data:   # Filebeat registry (zer fitxategi irakurri den gogoratzeko)
+  es-data:         # Elasticsearch datuen iraunkortasuna
+  telegram_state:  # Telegram notifier-ak bidalitako alertak gogoratzeko
+
+services:
+
+  # ── Kafka — Mezularitza bufferra (KRaft mode, zookeeper gabe) ────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    ports:
+      - "29092:29092"   # Host lokaletik sartzeko (Python script-ak: localhost:29092)
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+      # Docker sare barnean: kafka:9092 (Filebeat, NiFi)
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cnc-net
+
+  # ── Filebeat — CSV fitxategien irakurlea ─────────────────────────────────────
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.10.2
+    user: root
+    command: ["filebeat", "-e", "--strict.perms=false"]
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./data/stream:/mnt/cnc-stream:ro   # Simuladorearen CSV-ak (tokiko karpeta)
+      - filebeat-data:/usr/share/filebeat/data
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - cnc-net
+
+  # ── Apache NiFi — Transformazioa eta bideratzea ──────────────────────────────
+  nifi:
+    image: apache/nifi:2.11.0
+    # HTTP/1.1 soilik: HTTP/2-rekin nabigatzaileko deskargak eta UI eguneraketak
+    # erdian mozten dira (batez ere Docker Desktop-en).
+    entrypoint:
+      - sh
+      - -c
+      - sed -i 's|^nifi.web.https.application.protocols=.*|nifi.web.https.application.protocols=http/1.1|' conf/nifi.properties && exec ../scripts/start.sh
+    ports:
+      - "8443:8443"   # HTTPS Web Interfazea (SSH tunela edo reverse proxy bidez)
+    environment:
+      NIFI_WEB_HTTPS_PORT: 8443
+      SINGLE_USER_CREDENTIALS_USERNAME: ${NIFI_USERNAME:-admin}
+      SINGLE_USER_CREDENTIALS_PASSWORD: ${NIFI_PASSWORD:?NIFI_PASSWORD falta da .env-n}
+    volumes:
+      - nifi-data:/opt/nifi/nifi-current/database_repository
+    depends_on:
+      kafka:
+        condition: service_healthy
+      scoring-api:
+        condition: service_started   # /health 3. fasean inplementatzen da
+    networks:
+      - cnc-net
+
+  # ── Elasticsearch — Biltegiratze eta bilaketa ────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    # Hostname finkoa + /etc/hosts-en sarrera: DNS-ak huts egiten badu (VPN, WSL, sare mugatua),
+    # JVM-ak ezin du bere hostname ebatzi eta Elasticsearch-ek abioan huts egiten du
+    # (UnknownHostException). Ez erabili edukiontziaren ID-a: aldatu egiten da birsortzean.
+    hostname: elasticsearch
+    extra_hosts:
+      - "elasticsearch:127.0.0.1"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false   # Desaktibatuta: ES ez da kanpora ireki behar (127.0.0.1)
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"   # Segurtasunik gabe: ez ireki kanpora
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - cnc-net
+
+  # ── Kibana — Bistaratzea ─────────────────────────────────────────────────────
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.2
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - cnc-net
+
+  # ── Scoring API — ML inferentzia (3. fasea) ──────────────────────────────────
+  scoring-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"   # FastAPI (ikasleek probatzeko: http://VM_IP:8000/docs)
+    volumes:
+      - ./models:/models:ro  # Modeloa hemen egon behar da: ./models/cnc_failure_model.pkl
+      - ./scoring/app:/app/app:ro   # kodea zuzenean (hot-reload)
+      - ./scoring/cnc_ml:/app/cnc_ml:ro
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    environment:
+      MODEL_PATH: /models/cnc_failure_model.pkl
+      # Autentifikazioa (JWT). Aldatu balioak edo .env fitxategian definitu.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET falta da .env-n}
+      API_USERNAME: ${API_USERNAME:-nifi}
+      API_PASSWORD: ${API_PASSWORD:?API_PASSWORD falta da .env-n}
+      ACCESS_TOKEN_EXPIRE_SECONDS: 300   # access tokena: 5 min
+      REFRESH_TOKEN_EXPIRE_DAYS: 30      # refresh tokena: 30 egun
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - cnc-net
+
+  # ── Streamlit — Panela: eskuzko iragarpena + monitorizazioa ───────────────────
+  streamlit:
+    build:
+      context: ./streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://scoring-api:8000
+      API_USERNAME: ${API_USERNAME:-nifi}
+      API_PASSWORD: ${API_PASSWORD:?API_PASSWORD falta da .env-n}
+      ES_URL: http://elasticsearch:9200
+      ES_INDEX: cnc-predictions
+    volumes:
+      - ./streamlit/app.py:/app/app.py:ro
+      - ./streamlit/config.py:/app/config.py:ro
+      - ./streamlit/ui:/app/ui:ro
+    command: ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0", "--browser.gatherUsageStats=false", "--server.runOnSave=true"]
+    depends_on:
+      scoring-api:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - cnc-net
+
+  # ── Telegram notifier — alertak Telegram-era bidaltzen ditu (panela itxita egon arren) ──
+  telegram-notifier:
+    build:
+      context: ./telegram-notifier
+    environment:
+      ES_URL: http://elasticsearch:9200
+      ES_INDEX: cnc-predictions
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      POLL_SECONDS: 15
+      STATE_FILE: /state/seen.json
+    volumes:
+      - telegram_state:/state
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - cnc-net
