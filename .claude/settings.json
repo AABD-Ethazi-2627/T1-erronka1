@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Edit(./.env)",
+      "Edit(./.env.*)",
+      "Write(./.env)",
+      "Write(./.env.*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(~/.ssh/**)",
+      "Read(~/.pki/**)",
+      "Read(~/.aws/**)",
+      "Bash(cat .env*)",
+      "Bash(printenv:*)",
+      "Bash(env)",
+      "Bash(docker inspect:*)",
+      "Bash(docker compose config:*)",
+      "Bash(docker-compose config:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Read|Grep|Glob|Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/block_secrets.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

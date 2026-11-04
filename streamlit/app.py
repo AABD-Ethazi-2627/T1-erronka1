@@ -8,15 +8,10 @@ import pandas as pd
 import requests
 import streamlit as st
 
-API_URL      = os.getenv("API_URL",      "http://scoring-api:8000").rstrip("/")
-API_USERNAME = os.getenv("API_USERNAME", "nifi")
-API_PASSWORD = os.getenv("API_PASSWORD", "")
-ES_URL       = os.getenv("ES_URL",       "http://elasticsearch:9200").rstrip("/")
-ES_INDEX     = os.getenv("ES_INDEX",     "cnc-predictions")
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+from config import (API_PASSWORD, API_URL, API_USERNAME, ES_INDEX, ES_SENSOR_INDEX, ES_URL,
+                    MAILAK)
+from ui.theme import apply_theme, current_theme, render_theme_switch
 
-MAILAK   = ["OK", "KONTUZ", "LARRIA"]
 SVG_FACTORY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 21h18v-2H3v2Zm2-4h3V8H5v9Zm5 0h4V3h-4v14Zm6 0h3v-6h-3v6Z"/></svg>'
 SVG_SHIELD = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 4 5v6c0 5.2 3.4 9.8 8 11 4.6-1.2 8-5.8 8-11V5l-8-3Zm-1 14-3-3 1.4-1.4L11 13.2l3.6-3.6L16 11l-5 5Z"/></svg>'
 SVG_ALERT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3 1.8 20h20.4L12 3Zm1 13h-2v-2h2v2Zm0-4h-2V8h2v4Z"/></svg>'
@@ -52,9 +47,19 @@ st.markdown("""
     background: #060d1a !important;
     color: #d8e6f3;
 }
-[data-testid="stHeader"]      { background: transparent !important; }
+[data-testid="stHeader"]      { display: none !important; height: 0 !important; }
 [data-testid="stToolbar"]     { display: none !important; }
-.block-container              { max-width: 1500px; padding: 0 1rem .5rem !important; }
+[data-testid="stDecoration"]  { display: none !important; }
+[data-testid="stAppViewBlockContainer"] { padding-top: 0 !important; }
+[data-testid="stMainBlockContainer"] { padding-top: 0 !important; }
+.stMainBlockContainer, .stAppViewBlockContainer { padding-top: 0 !important; }
+[data-testid="stAppViewContainer"] { padding-top: 0 !important; }
+[data-testid="stAppViewContainer"] > .main { padding-top: 0 !important; }
+[data-testid="stAppViewContainer"] > .main > div { padding-top: 0 !important; }
+section.main > div { padding-top: 0 !important; }
+[data-testid="stAppViewContainer"] main { padding-top: 0 !important; }
+[data-testid="stSidebarContent"] { padding-top: 0 !important; margin-top: -5rem !important; }
+.block-container              { max-width: 1500px; padding: 0 1rem .5rem !important; margin-top: -1.5rem !important; }
 
 /* ── Sidebar fija, sin colapsar ── */
 [data-testid="stSidebar"] {
@@ -338,6 +343,14 @@ div[class*="resizeHandle"] { display: none !important; }
     text-transform: none !important;
 }
 
+/* Reduce los espacios del dashboard sin cambiar el resto de vistas. */
+@media (min-width: 901px) {
+    .block-container:has(.dash-kpis) [data-testid="stVerticalBlock"] { gap: .65rem !important; }
+    .block-container:has(.dash-kpis) .page-header { padding-top: .4rem; padding-bottom: .4rem; margin-bottom: .3rem; }
+    .block-container:has(.dash-kpis) .dash-kpis { margin-bottom: .2rem; }
+    .block-container:has(.dash-kpis) .dash-kpi { padding-top: .6rem; padding-bottom: .55rem; }
+}
+
 /* ── Títulos ── */
 h1 { font-size: 1.2rem !important; font-weight: 700 !important; color: #e8f3ff !important; }
 h2 { font-size: 1rem !important;   font-weight: 600 !important; color: #d4e6f5 !important; }
@@ -402,6 +415,9 @@ h3 { font-size: .88rem !important; font-weight: 600 !important; color: #a8c4de !
     font-size: 1.2rem !important;
     line-height: 1 !important;
 }
+/* El refresco se controla mediante el deslizador; se ocultan los controles
+   auxiliares heredados para evitar duplicar la interfaz. */
+[class*="st-key-refresh_option_"] { display: none !important; }
 
 /* Selector de actualización: botones compactos tipo píldora. */
 [data-testid="stRadio"] > div[role="radiogroup"] {
@@ -503,6 +519,22 @@ h3 { font-size: .88rem !important; font-weight: 600 !important; color: #a8c4de !
 }
 
 /* Evita animaciones innecesarias en equipos configurados para reducir movimiento. */
+.stApp,
+[data-testid="stSidebar"],
+[data-testid="stHeader"],
+.page-header,
+[data-testid="stMetric"],
+[data-testid="stForm"],
+[data-testid="stAltairChart"],
+[data-testid="stVegaLiteChart"],
+.dash-kpi,
+button,
+input,
+[data-baseweb="select"] > div {
+    transition: background-color .35s ease, color .35s ease,
+                border-color .35s ease, box-shadow .35s ease !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;
@@ -513,6 +545,10 @@ h3 { font-size: .88rem !important; font-weight: 600 !important; color: #a8c4de !
 }
 </style>
 """, unsafe_allow_html=True)
+
+# El tema claro se aplica después de los estilos base para que sus overrides
+# tengan prioridad. El valor se conserva en session_state durante los reruns.
+apply_theme()
 
 
 # ── Helpers API ────────────────────────────────────────────────────────────────
@@ -527,23 +563,6 @@ def request_retry(method: str, url: str, attempts: int = 3, **kwargs):
             if attempt < attempts - 1:
                 time.sleep(0.15 * (attempt + 1))
     raise last_error
-
-
-def enviar_telegram(texto: str) -> bool:
-    """Envía un mensaje solo si Telegram está configurado."""
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        return False
-    try:
-        response = request_retry(
-            "POST",
-            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-            json={"chat_id": TELEGRAM_CHAT_ID, "text": texto},
-            timeout=8,
-        )
-        response.raise_for_status()
-        return True
-    except requests.RequestException:
-        return False
 
 
 def lortu_tokena(behartu: bool = False) -> str:
@@ -584,9 +603,9 @@ def api_egoera() -> tuple[bool, str]:
 
 
 # ── Helpers Elasticsearch ──────────────────────────────────────────────────────
-def es_bilatu(body: dict) -> dict:
+def es_bilatu(body: dict, index: str = ES_INDEX) -> dict:
     try:
-        r = request_retry("POST", f"{ES_URL}/{ES_INDEX}/_search", json=body, timeout=10)
+        r = request_retry("POST", f"{ES_URL}/{index}/_search", json=body, timeout=10)
     except (requests.ConnectionError, requests.Timeout) as exc:
         raise ElasticsearchUnavailable from exc
     if r.status_code == 404:
@@ -622,6 +641,15 @@ def cargar_dashboard() -> list[dict]:
         "sort": [{"timestamp": "desc"}],
         "_source": ["timestamp", "machine_id", "failure_probability", "alert_level", "failure_predicted"],
     })
+
+
+@st.cache_data(ttl=10, show_spinner=False)
+def cargar_sensores_dashboard() -> list[dict]:
+    return es_bilatu({
+        "size": 1000,
+        "sort": [{"timestamp": "desc"}],
+        "_source": ["timestamp", "air_temp_K", "process_temp_K", "vibration_mm_s", "tool_wear_min"],
+    }, index=ES_SENSOR_INDEX)["hits"]["hits"]
 
 
 def es_egoera() -> tuple[bool, int]:
@@ -677,8 +705,17 @@ with st.sidebar:
         "1 h": 3600,
     }
     st.caption("Actualización automática")
-    selected_refresh = st.session_state.get("auto_refresh_choice", " ")
-    refresh_items = list(refresh_options.items())
+    selected_refresh = st.select_slider(
+        "Intervalo",
+        options=list(refresh_options),
+        format_func=lambda value: "Desactivado" if value == " " else value,
+        value=st.session_state.get("auto_refresh_choice", " "),
+        key="auto_refresh_choice",
+        label_visibility="collapsed",
+        help="Actualiza el contenido automáticamente sin recargar la barra lateral.",
+    )
+    # La interfaz activa usa únicamente el select_slider.
+    refresh_items = []
     for row_start in range(0, len(refresh_items), 2):
         option_cols = st.columns(2, gap="small")
         for col, (refresh_label, refresh_value) in zip(option_cols, refresh_items[row_start:row_start + 2]):
@@ -704,6 +741,10 @@ with st.sidebar:
                     st.rerun()
     st.session_state["auto_refresh_seconds"] = refresh_options.get(selected_refresh, 0)
 
+    st.divider()
+    st.caption("Apariencia")
+    render_theme_switch()
+
     atala = st.session_state.atal
 
     st.divider()
@@ -726,32 +767,50 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
-        st.checkbox("Notificaciones Telegram", key="telegram_enabled", value=False,
-                    help="Envía una notificación cuando aparece una alerta nueva.")
-    else:
-        st.caption("Telegram no configurado")
+    st.caption("Alertas a Telegram: servicio en segundo plano")
 
     ordu = None
 
 
 # ── Helpers visualización ──────────────────────────────────────────────────────
 def altair_config():
+    light = current_theme() == "light"
     """Configuración común para gráficos Altair con fondo transparente."""
     return dict(
-        configure_view=dict(strokeWidth=0, fill="transparent"),
+        configure_view=dict(strokeWidth=0, fill="#ffffff" if light else "transparent"),
         configure_axis=dict(
-            gridColor="rgba(255,255,255,.05)",
-            domainColor="rgba(255,255,255,.08)",
-            tickColor="transparent",
-            labelColor="#8ea8c2",
-            titleColor="#c3d5e6",
+            gridColor="#dbe4ef" if light else "rgba(255,255,255,.05)",
+            domainColor="#b9c9d9" if light else "rgba(255,255,255,.08)",
+            tickColor="#b9c9d9" if light else "transparent",
+            labelColor="#405b75" if light else "#8ea8c2",
+            titleColor="#294563" if light else "#c3d5e6",
         ),
         configure_title=dict(color="#3a5572"),
     )
 
 
+def dashboard_chart_style(chart):
+    """Aplica los mismos márgenes y colores a todos los gráficos del panel."""
+    light = current_theme() == "light"
+    return (chart.properties(width="container", height=150,
+                             background="#ffffff" if light else "transparent",
+                             autosize=alt.AutoSizeParams(type="fit", contains="padding"),
+                             padding={"left": 8, "right": 16, "top": 8, "bottom": 8})
+            .configure_view(strokeWidth=0, fill="#ffffff" if light else "transparent")
+            .configure_axis(
+                gridColor="#dbe4ef" if light else "rgba(255,255,255,.05)",
+                domainColor="#b9c9d9" if light else "rgba(255,255,255,.08)",
+                tickColor="#b9c9d9" if light else "transparent",
+                labelColor="#405b75" if light else "#8ea8c2",
+                titleColor="#294563" if light else "#c3d5e6",
+                labelPadding=6, titlePadding=10,
+            )
+            .configure_legend(labelColor="#405b75" if light else "#c3d5e6",
+                              titleColor="#294563" if light else "#c3d5e6"))
+
+
 def chart_bar(data, x, y, color_field=None, color_range=None, height=140):
+    light = current_theme() == "light"
     base = (
         alt.Chart(data)
         .mark_bar(cornerRadiusTopLeft=5, cornerRadiusTopRight=5)
@@ -763,13 +822,13 @@ def chart_bar(data, x, y, color_field=None, color_range=None, height=140):
                                    legend=None)} if color_field else {}),
             tooltip=[x, y],
         )
-        .properties(width="container", height=height)
-        .configure_view(strokeWidth=0, fill="transparent")
+        .properties(width="container", height=height, background="#ffffff" if light else "transparent")
+        .configure_view(strokeWidth=0, fill="#ffffff" if light else "transparent")
         .configure_axis(
-            gridColor="rgba(255,255,255,.05)",
-            domainColor="rgba(255,255,255,.08)",
-            tickColor="transparent",
-            labelColor="#8ea8c2",
+            gridColor="#dbe4ef" if light else "rgba(255,255,255,.05)",
+            domainColor="#b9c9d9" if light else "rgba(255,255,255,.08)",
+            tickColor="#b9c9d9" if light else "transparent",
+            labelColor="#405b75" if light else "#8ea8c2",
         )
     )
     return base
@@ -849,61 +908,99 @@ def page_dashboard():
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    try:
+        sensors = pd.DataFrame([hit["_source"] for hit in cargar_sensores_dashboard()])
+    except ElasticsearchIndexMissing:
+        st.warning(f"El índice de sensores `{ES_SENSOR_INDEX}` todavía no existe.")
+        sensors = pd.DataFrame()
+    except Exception:
+        st.warning("No se han podido cargar los datos de sensores de Elasticsearch.")
+        sensors = pd.DataFrame()
+    if not sensors.empty and "timestamp" in sensors:
+        sensors["timestamp"] = pd.to_datetime(sensors["timestamp"], errors="coerce")
+        sensors = sensors.dropna(subset=["timestamp"])
+        for field in ("air_temp_K", "process_temp_K", "vibration_mm_s", "tool_wear_min"):
+            if field in sensors:
+                sensors[field] = pd.to_numeric(sensors[field], errors="coerce")
 
+    st.caption("Medias cada 5 minutos, calculadas con los últimos 1.000 registros de cada índice.")
     c1, c2 = st.columns(2)
     with c1:
-        st.caption("Distribución de alertas")
-        dist = (df["alert_level"].value_counts()
-                  .reindex(MAILAK).fillna(0)
-                  .rename_axis("nivel").reset_index(name="n"))
-        ch = chart_bar(
-            dist, "nivel:N", "n:Q",
-            color_field="nivel:N",
-            color_range=["#34d399", "#fbbf24", "#fb7185"],
-        )
-        st.altair_chart(ch, use_container_width=True)
+        st.caption("Temperatura media del aire y del proceso")
+        fields = [f for f in ("air_temp_K", "process_temp_K")
+                  if f in sensors and sensors[f].notna().any()]
+        if fields and "timestamp" in sensors:
+            temperatures = sensors.set_index("timestamp").sort_index().resample("5min")[fields].mean()
+            temperatures = temperatures.subtract(273.15).reset_index().melt(
+                id_vars="timestamp", var_name="sensor", value_name="temperatura"
+            ).dropna(subset=["temperatura"])
+            temperatures["sensor"] = temperatures["sensor"].map({"air_temp_K": "Aire", "process_temp_K": "Proceso"})
+            chart = alt.Chart(temperatures).mark_line(point=True).encode(
+                x=alt.X("timestamp:T", title=None),
+                y=alt.Y("temperatura:Q", title="Temperatura media (°C)", scale=alt.Scale(zero=False)),
+                color=alt.Color("sensor:N", title=None, legend=None,
+                                scale=alt.Scale(domain=["Aire", "Proceso"], range=["#7cc8f8", "#087bca"])),
+                tooltip=[alt.Tooltip("timestamp:T", title="Hora"), alt.Tooltip("sensor:N", title="Sensor"),
+                         alt.Tooltip("temperatura:Q", title="Media (°C)", format=".1f")],
+            )
+            st.altair_chart(dashboard_chart_style(chart), use_container_width=True)
+        else:
+            st.info("No hay lecturas de temperatura disponibles en el índice de sensores.")
+        st.caption("Azul claro: aire · azul oscuro: proceso. Ayuda a detectar cambios o aumentos sostenidos.")
 
     with c2:
         st.caption("Evolución del riesgo (media 5 min)")
         serie = (df.set_index("timestamp").sort_index()
                    .groupby(pd.Grouper(freq="5min"))["failure_probability"].mean())
-        st.line_chart(serie, color="#38bdf8", height=140)
+        serie_chart = alt.Chart(serie.reset_index(name="risk")).mark_line(
+            color="#087ea4" if current_theme() == "light" else "#38bdf8"
+        ).encode(
+            x=alt.X("timestamp:T", title=None),
+            y=alt.Y("risk:Q", title="Riesgo medio", axis=alt.Axis(format="%")),
+        )
+        st.altair_chart(dashboard_chart_style(serie_chart), use_container_width=True)
+        st.caption("Muestra cómo cambia la probabilidad media de fallo estimada por el modelo.")
 
     c3, c4 = st.columns(2)
     with c3:
-        st.caption("Top de máquinas por riesgo")
-        top_maq = (df.groupby("machine_id", as_index=False)["failure_probability"]
-                     .max().nlargest(10, "failure_probability"))
+        st.caption("Máquinas con mayor riesgo actual (última predicción)")
+        top_maq = last[["machine_id", "failure_probability"]].nlargest(10, "failure_probability")
         ch2 = (
             alt.Chart(top_maq)
             .mark_bar(cornerRadiusEnd=5)
             .encode(
-                y=alt.Y("machine_id:N", sort="-x", title=None),
+                y=alt.Y("machine_id:N", sort="-x", title=None, axis=alt.Axis(labelOverlap=False)),
                 x=alt.X("failure_probability:Q", title=None, axis=alt.Axis(format="%")),
                 color=alt.Color("failure_probability:Q",
                                 scale=alt.Scale(range=["#38bdf8", "#8b5cf6", "#f43f5e"]),
                                 legend=None),
                 tooltip=["machine_id:N", alt.Tooltip("failure_probability:Q", format=".1%")],
             )
-            .properties(width="container", height=140)
-            .configure_view(strokeWidth=0, fill="transparent")
-            .configure_axis(
-                gridColor="rgba(255,255,255,.05)",
-                domainColor="rgba(255,255,255,.08)",
-                tickColor="transparent",
-                labelColor="#8ea8c2",
-            )
         )
-        st.altair_chart(ch2, use_container_width=True)
+        st.altair_chart(dashboard_chart_style(ch2), use_container_width=True)
+        st.caption("Ordena hasta diez máquinas por su última probabilidad de fallo, de mayor a menor.")
 
     with c4:
-        st.caption("Distribución de probabilidades")
-        bins = pd.cut(df["failure_probability"], bins=[0,.2,.4,.6,.8,1], include_lowest=True)
-        hdf  = bins.value_counts().sort_index().rename_axis("rango").reset_index(name="n")
-        hdf["rango"] = hdf["rango"].astype(str)
-        ch3 = chart_bar(hdf, "rango:N", "n:Q", color_field="n:Q")
-        st.altair_chart(ch3, use_container_width=True)
+        has_vibration = "vibration_mm_s" in sensors and sensors["vibration_mm_s"].notna().any()
+        field = "vibration_mm_s" if has_vibration else "tool_wear_min"
+        unit = "Vibración media (mm/s)" if has_vibration else "Desgaste medio (min)"
+        st.caption("Vibración media" if has_vibration else "Desgaste medio de herramienta")
+        if field in sensors and sensors[field].notna().any() and "timestamp" in sensors:
+            series = (sensors.set_index("timestamp").sort_index().resample("5min")[field]
+                      .mean().dropna().reset_index())
+            chart = alt.Chart(series).mark_line(color="#f59e0b", point=True).encode(
+                x=alt.X("timestamp:T", title=None),
+                y=alt.Y(f"{field}:Q", title=unit, scale=alt.Scale(zero=False)),
+                tooltip=[alt.Tooltip("timestamp:T", title="Hora"),
+                         alt.Tooltip(f"{field}:Q", title=unit, format=".2f")],
+            )
+            st.altair_chart(dashboard_chart_style(chart), use_container_width=True)
+        else:
+            st.info("No hay lecturas disponibles para este gráfico en el índice de sensores.")
+        if has_vibration:
+            st.caption("Muestra la vibración media para identificar cambios en el comportamiento de las máquinas.")
+        else:
+            st.caption("Muestra el desgaste medio de las herramientas. No hay lecturas de vibración disponibles.")
 
 
 # ── Predicciones ──────────────────────────────────────────────────────────────
@@ -997,6 +1094,22 @@ def cargar_df(sel: list[str], size: int = 2000) -> pd.DataFrame:
     return df
 
 
+def tabla_estilo(df: pd.DataFrame):
+    """Estilo explícito para que las tablas sigan el tema claro."""
+    if current_theme() == "dark":
+        return df
+    return df.style.set_properties(
+        **{
+            "background-color": "#ffffff",
+            "color": "#263f58",
+            "border-color": "#dbe4ef",
+        }
+    ).set_table_styles([
+        {"selector": "th", "props": [("background-color", "#edf4fb"), ("color", "#294563"), ("font-weight", "600")]},
+        {"selector": "tr:hover td", "props": [("background-color", "#f4f8fc")]},
+    ])
+
+
 def page_datos():
     st.markdown(f"""<div class="page-header pg-in"><div><h2>Explorador de datos</h2>
     </div></div>""", unsafe_allow_html=True)
@@ -1028,7 +1141,24 @@ def page_datos():
     m3.metric("Riesgo medio", f"{df['failure_probability'].mean():.1%}")
     st.caption("Evolución del riesgo y volumen de predicciones")
     serie = df.set_index("timestamp").resample("15min")["failure_probability"].agg(["mean", "count"])
-    st.line_chart(serie.rename(columns={"mean": "Riesgo medio", "count": "Predicciones"}), height=180)
+    light = current_theme() == "light"
+    datos_serie = serie.reset_index().rename(columns={"mean": "risk", "count": "predictions"})
+    base_chart = alt.Chart(datos_serie).encode(x=alt.X("timestamp:T", title=None))
+    volumen = base_chart.mark_bar(color="#b9d7e8" if light else "#24577a", opacity=0.45).encode(
+        y=alt.Y("predictions:Q", title="Predicciones")
+    )
+    riesgo = base_chart.mark_line(color="#087ea4" if light else "#38bdf8", strokeWidth=2.5).encode(
+        y=alt.Y("risk:Q", title="Riesgo medio", axis=alt.Axis(format="%"))
+    )
+    datos_chart = alt.layer(volumen, riesgo).resolve_scale(y="independent").properties(
+        width="container", height=180, background="#ffffff" if light else "transparent"
+    ).configure_view(strokeWidth=0).configure_axis(
+        gridColor="#dbe4ef" if light else "rgba(255,255,255,.05)",
+        domainColor="#b9c9d9" if light else "rgba(255,255,255,.08)",
+        labelColor="#405b75" if light else "#8ea8c2",
+        titleColor="#405b75" if light else "#8ea8c2",
+    )
+    st.altair_chart(datos_chart, use_container_width=True)
     st.markdown(f"**Registros** — {len(df):,}")
     df_show = df.copy()
     df_show["failure_predicted"] = df_show["failure_predicted"].map({True: "Sí", False: "No", "true": "Sí", "false": "No"}).fillna(df_show["failure_predicted"].astype(str))
@@ -1055,21 +1185,6 @@ def page_alertas():
         st.error(f"No se pudieron cargar las alertas: {e}"); return
     if df.empty:
         st.success("No hay eventos registrados."); return
-    if st.session_state.get("telegram_enabled", False):
-        enviados = st.session_state.setdefault("telegram_alertas_enviadas", set())
-        for _, alerta in df[df["alert_level"] != "OK"].head(20).iterrows():
-            event_id = alerta["event_id"]
-            if event_id in enviados:
-                continue
-            nivel = "CRÍTICA" if alerta["alert_level"] == "LARRIA" else "ADVERTENCIA"
-            mensaje = (
-                f"🚨 CNC Guard · {nivel}\n"
-                f"Máquina: {alerta.get('machine_id', 'N/D')}\n"
-                f"Probabilidad de fallo: {float(alerta.get('failure_probability', 0)):.1%}\n"
-                f"Fecha: {alerta.get('timestamp', 'N/D')}"
-            )
-            if enviar_telegram(mensaje):
-                enviados.add(event_id)
     f1, f2, f3 = st.columns([1.25, 1.25, 2])
     maquina = f1.selectbox("Máquina", ["Todas las máquinas"] + sorted(df["machine_id"].dropna().unique().tolist()), key="alerta_maquina")
     periodo = f2.selectbox("Periodo", ["Últimos 7 días", "Últimos 30 días", "Todo el histórico"], key="alerta_periodo")
@@ -1081,17 +1196,27 @@ def page_alertas():
     criticas = int((df["alert_level"] == "LARRIA").sum())
     advertencias = int((df["alert_level"] == "KONTUZ").sum())
     informativas = int((df["alert_level"] == "OK").sum())
-    nivel = st.radio("", [f"Todas ({len(df)})", f"Críticas ({criticas})", f"Advertencias ({advertencias})", f"Informativas ({informativas})"], horizontal=True, key="alerta_nivel", label_visibility="collapsed")
+    nivel = st.radio("", [f"Todas ({len(df)})", f"LARRIA ({criticas})", f"KONTUZ ({advertencias})", f"OK ({informativas})"], horizontal=True, key="alerta_nivel_codigo", label_visibility="collapsed")
     nivel = nivel.split(" (")[0]
-    nivel_map = {"Todas": None, "Críticas": "LARRIA", "Advertencias": "KONTUZ", "Informativas": "OK"}
+    nivel_map = {"Todas": None, "LARRIA": "LARRIA", "KONTUZ": "KONTUZ", "OK": "OK"}
     if nivel_map[nivel]:
         df = df[df["alert_level"] == nivel_map[nivel]]
     if df.empty:
         st.info("No hay alertas para los filtros seleccionados."); return
+    # DiagnÃ³stico visible de los datos que llegan actualmente desde Elasticsearch.
+    print("[CNC Guard] Datos CNC recibidos:")
+    print(df[["timestamp", "machine_id", "failure_probability", "alert_level"]].head(20).to_string(index=False))
+    with st.expander("Ver datos recibidos de los CNC", expanded=False):
+        st.code(
+            df[["timestamp", "machine_id", "failure_probability", "alert_level"]]
+            .head(20)
+            .to_string(index=False),
+            language="text",
+        )
     tabla = df.sort_values("timestamp", ascending=False).copy()
     tabla["Fecha y hora"] = tabla["timestamp"]
     tabla["Máquina"] = tabla["machine_id"]
-    tabla["Tipo"] = tabla["alert_level"].map({"LARRIA": "Crítica", "KONTUZ": "Advertencia", "OK": "Informativa"})
+    tabla["Tipo"] = tabla["alert_level"]
     tabla["Descripción"] = tabla["alert_level"].map({"LARRIA": "Posible fallo crítico · requiere revisión inmediata", "KONTUZ": "Condición anómala · revisar en el próximo mantenimiento", "OK": "Mantenimiento recomendado · sin anomalía crítica"})
     tabla["Valor"] = tabla["failure_probability"].map(lambda value: f"{value:.1%}")
     tabla["Estado"] = "● Activa"
