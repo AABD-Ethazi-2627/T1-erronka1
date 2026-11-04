@@ -25,6 +25,6 @@ Fuente en `.claude/skills/<nombre>/SKILL.md`, con copia real en `.agents/skills/
 | `pdf-media` | Dado un PDF: extraer sus imágenes a `docs/media/<pdf>/` y referenciarlas en Markdown |
 
 ## Convenciones
-- Los umbrales de alerta (OK ≤ 0.5, KONTUZ 0.5–0.8, LARRIA > 0.8) viven en `scoring/app/services/model.py`.
+- Los umbrales de alerta (OK ≤ 0.15, KONTUZ 0.15–0.8, LARRIA > 0.8) viven en `scoring/app/services/model.py`.
 - No uses `failure_TWF/HDF/PWF/OSF/RNF` como features del modelo (data leakage).
 - Tests: `mcp-server/.venv/bin/python -m pytest mcp-server/tests`.

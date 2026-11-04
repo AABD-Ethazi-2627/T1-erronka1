@@ -99,7 +99,7 @@ def predict_failure(
     """Sentsore-irakurketa batetik hutsegite-probabilitatea kalkulatu.
 
     machine_type: 'L', 'M' edo 'H'. Itzulera: failure_probability (0-1),
-    failure_predicted (>0.5) eta alert_level (OK <=0.5, KONTUZ <=0.8, LARRIA >0.8).
+    failure_predicted (>0.15) eta alert_level (OK <=0.15, KONTUZ <=0.8, LARRIA >0.8).
     Ez du ezer gordetzen Elasticsearch-en.
     """
     if machine_type not in ("L", "M", "H"):
