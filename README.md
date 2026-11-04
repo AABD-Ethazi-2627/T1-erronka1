@@ -317,15 +317,16 @@ Alerta mailak: `OK` (≤ 0.5), `KONTUZ` (0.5–0.8), `LARRIA` (> 0.8).
 
 ### 12.3 Skills
 
-`.claude/skills/`-en daude eta Claude-k automatikoki aktibatzen ditu galderak bat datorrenean (ez da komandorik idatzi behar). Behartzeko: `/diagnose-machine`, `/retrain-model` edo `/stack-troubleshooting`.
+`.claude/skills/`-en daude eta Claude-k automatikoki aktibatzen ditu galderak bat datorrenean (ez da komandorik idatzi behar). Behartzeko: `/euskera-azterketa` edo `/pdf-media`.
 
 | Skill | Noiz aktibatzen da | Galdera-adibideak |
 |---|---|---|
-| `diagnose-machine` | Makina baten egoera, arriskua edo alertak | "Makinaren bat arriskuan dago?", "Diagnostikatu CNC-039", "Zergatik dago CNC-012 alertan?" |
-| `stack-troubleshooting` | Datuak ez dira iristen edo edukiontzi bat huts egiten du | "Ez dira datuak iristen", "Dashboard-a hutsik dago", "Ez dago alertarik" |
-| `retrain-model` | Modeloa berrentrenatu, hobetu edo ordezkatu | "Berrentrenatu modeloa", "Iragarpenak arraroak dira" |
+| `euskera-azterketa` | Dokumentazioaren euskara-maila neurtu edo zuzendu nahi denean | "Zer euskara-maila du README-ak?", "Berrikusi ENUNTZIATUA.md-ren gramatika" |
+| `pdf-media` | PDF bat ematen denean eta bere irudiak proiektuan gorde nahi direnean | "Atera PDF honen irudiak eta sartu README-an" |
 
-`diagnose-machine`-ek honela jokatzen du: `model_health` → alertak/egoera kontsultatu → **joera** aztertu (ez soilik azken balioa) → kausa probableak (TWF, HDF, PWF, OSF, RNF, **hipotesi gisa**) → gomendatutako ekintza. Modeloa `down` badago, `stack-troubleshooting`-era pasatzen da.
+`euskera-azterketa`-k bost subagente paraleloan jartzen ditu (lexikoa, gramatika, sintaxia, ortografia eta koherentzia), emaitzak bateratzen ditu eta maila (B1/B2/C1) zehazten du, zuzenketa-proposamenekin. Ez du ezer aldatzen zuk eskatu arte.
+
+`pdf-media`-k PDFko irudiak `docs/media/<pdf-izena>/` karpetan gordetzen ditu (`manifest.json`-ekin) eta Markdown dokumentuetan erreferentziatzen ditu bide erlatiboekin. Behar du: `poppler` (`pdfimages`, `pdftoppm`).
 
 ### 12.4 Beste agenteak (Codex, Cursor...)
 
@@ -334,7 +335,7 @@ Konfigurazioa ez da Claude Code-rentzat bakarrik:
 | Fitxategia | Zertarako |
 |---|---|
 | `AGENTS.md` | Agente guztientzako testuingurua (Codex, Cursor, Copilot...); `CLAUDE.md`-k inportatzen du |
-| `.agents/skills/` | `.claude/skills/`-en esteka sinbolikoa: skill berak, kopiarik gabe |
+| `.agents/skills/` | `.claude/skills/`-en kopia erreala, Codex-ek proiektuan irakurtzen duena (iturria `.claude/skills/` da). Skill bat aldatu ondoren: `scripts/sync-skills.sh` |
 | `.codex/config.toml` | `cnc-guard` MCP-a Codex-entzat (Codex proiektuaren erroan exekutatu) |
 | `.mcp.json` | `cnc-guard` MCP-a Claude Code-rentzat |
 

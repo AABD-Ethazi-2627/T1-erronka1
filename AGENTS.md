@@ -13,16 +13,15 @@ Herramientas: `model_health`, `list_active_alerts`, `get_machine_status`, `predi
 - Codex: configurado en `.codex/config.toml`.
 - Otros clientes: comando `mcp-server/.venv/bin/python mcp-server/server.py` (stdio), con `API_URL=http://localhost:8000` y `ES_URL=http://localhost:9200`.
 - Instalación: `cd mcp-server && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
-- Un resultado de 0 alertas no significa "sin riesgo": puede ser que no lleguen datos. Compruébalo con `stack-troubleshooting`.
+- Un resultado de 0 alertas no significa "sin riesgo": puede ser que no lleguen datos. Compruébalo con `docker compose ps` y los logs de Filebeat/NiFi.
 
 ## Skills
-Están en `.claude/skills/<nombre>/SKILL.md` (también visibles en `.agents/skills/`). Si tu agente no las carga solo, lee el `SKILL.md` correspondiente cuando la tarea encaje:
+Fuente en `.claude/skills/<nombre>/SKILL.md`, con copia real en `.agents/skills/` (la que leen Codex y otros agentes); tras editar una skill, ejecuta `scripts/sync-skills.sh`. Si tu agente no las carga solo, lee el `SKILL.md` correspondiente cuando la tarea encaje:
 
 | Skill | Cuándo |
 |---|---|
-| `diagnose-machine` | Estado, riesgo o alertas de una máquina CNC; "¿hay alguna máquina en peligro?" |
-| `stack-troubleshooting` | "No llegan datos", dashboard vacío, un contenedor falla |
-| `retrain-model` | Reentrenar, validar o desplegar `models/cnc_failure_model.pkl` |
+| `euskera-azterketa` | Revisar/puntuar el euskera de la documentación (nivel, léxico, gramática); lanza subagentes por dimensión |
+| `pdf-media` | Dado un PDF: extraer sus imágenes a `docs/media/<pdf>/` y referenciarlas en Markdown |
 
 ## Convenciones
 - Los umbrales de alerta (OK ≤ 0.5, KONTUZ 0.5–0.8, LARRIA > 0.8) viven en `scoring/app/services/model.py`.
