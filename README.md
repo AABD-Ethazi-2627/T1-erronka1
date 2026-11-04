@@ -364,7 +364,7 @@ Ez dira eskuz deitzen: Claude-ri galdetu eta berak aukeratzen du tresna egokia. 
 | `get_machine_status` | Makina baten azken iragarpenak eta joera | "Zer moduz dago CNC-039?" |
 | `predict_failure` | Sentsore-balio hipotetikoekin probabilitatea kalkulatu (ez du ezer gordetzen) | "Zer probabilitate izango luke M motako makina batek 2800 rpm, 60 Nm eta 220 min higadurarekin?" |
 
-Alerta mailak: `OK` (≤ 0.5), `KONTUZ` (0.5–0.8), `LARRIA` (> 0.8).
+Alerta mailak: `OK` (≤ 0.15), `KONTUZ` (0.15–0.8), `LARRIA` (> 0.8).
 
 ### 12.3 Skills
 
