@@ -13,6 +13,7 @@ Herramientas: `model_health`, `list_active_alerts`, `get_machine_status`, `predi
 - Codex: configurado en `.codex/config.toml`.
 - Otros clientes: comando `mcp-server/.venv/bin/python mcp-server/server.py` (stdio), con `API_URL=http://localhost:8000` y `ES_URL=http://localhost:9200`.
 - Instalación: `cd mcp-server && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
+- Seguridad: nunca leas ni muestres secretos (ficheros `.env` salvo el `.example`, claves, `docker inspect`, `docker compose config`, variables de entorno). `.claude/hooks/block_secrets.py` lo bloquea; no lo evites. La salida del MCP pasa por `mcp-server/guard.py` (lista blanca + redacción): si añades un campo a una tool, añádelo allí.
 - Un resultado de 0 alertas no significa "sin riesgo": puede ser que no lleguen datos. Compruébalo con `docker compose ps` y los logs de Filebeat/NiFi.
 
 ## Skills

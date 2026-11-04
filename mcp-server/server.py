@@ -2,6 +2,8 @@
 CNC Guard — MCP zerbitzaria.
 Scoring API-a eta Elasticsearch Claude-ri tresna gisa erakusten dizkio (stdio bidez).
 Irakurketa/kalkulu tresnak soilik: ez du ezer aldatzen ez ezabatzen.
+Tresna guztien irteera `guard.py` arnesetik pasatzen da (zerrenda zuria + sekretuen ezkutatzea):
+modeloak ez du inoiz kredentzialik, tokenik, IPrik edo akats-testu gordinik jasotzen.
 
 Abiarazteko: python mcp-server/server.py   (normalean .mcp.json-ek abiarazten du)
 """
@@ -13,6 +15,8 @@ from pathlib import Path
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+
+import guard
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -70,17 +74,19 @@ def _es_search(body: dict) -> list[dict]:
 
 
 @mcp.tool()
+@guard.guarded(guard.SPEC_HEALTH)
 def model_health() -> dict:
     """Scoring API-aren eta ereduaren egoera (API erantzuten du? eredua kargatuta dago?)."""
     try:
         r = httpx.get(f"{API_URL}/health", timeout=TIMEOUT)
         r.raise_for_status()
         return r.json()
-    except httpx.HTTPError as e:
-        return {"status": "down", "error": str(e), "api_url": API_URL}
+    except httpx.HTTPError:
+        return {"status": "down"}
 
 
 @mcp.tool()
+@guard.guarded(guard.SPEC_PREDICT)
 def predict_failure(
     machine_id: str,
     machine_type: str,
@@ -98,6 +104,10 @@ def predict_failure(
     """
     if machine_type not in ("L", "M", "H"):
         return {"error": "machine_type 'L', 'M' edo 'H' izan behar da"}
+    if not guard.valid_machine_id(machine_id):
+        return {"error": "machine_id baliogabea (letrak, zenbakiak, - eta _; gehienez 32)"}
+    if not guard.finite(air_temp_K, process_temp_K, rpm, torque_Nm, tool_wear_min):
+        return {"error": "sentsore-balioak zenbaki finituak izan behar dira"}
     payload = {
         "machine_id": machine_id,
         "machine_type": machine_type,
@@ -107,37 +117,34 @@ def predict_failure(
         "torque_Nm": torque_Nm,
         "tool_wear_min": tool_wear_min,
     }
-    try:
-        r = httpx.post(
-            f"{API_URL}/predict",
-            json=payload,
-            headers={"Authorization": f"Bearer {_access_token()}"},
-            timeout=TIMEOUT,
-        )
-        r.raise_for_status()
-        return r.json()
-    except (httpx.HTTPError, RuntimeError) as e:
-        return {"error": str(e)}
+    r = httpx.post(
+        f"{API_URL}/predict",
+        json=payload,
+        headers={"Authorization": f"Bearer {_access_token()}"},
+        timeout=TIMEOUT,
+    )
+    r.raise_for_status()
+    return r.json()
 
 
 @mcp.tool()
+@guard.guarded(guard.SPEC_STATUS)
 def get_machine_status(machine_id: str, last_n: int = 10) -> dict:
     """Makina baten azken N iragarpenak (berrienetik zaharrenera) Elasticsearch-etik.
 
     Itzultzen du: iragarpenen zerrenda, probabilitate-joera (trend) eta azken alerta-maila.
     """
+    if not guard.valid_machine_id(machine_id):
+        return {"error": "machine_id baliogabea (letrak, zenbakiak, - eta _; gehienez 32)"}
     last_n = max(1, min(last_n, 100))
-    try:
-        hits = _es_search(
-            {
-                "size": last_n,
-                "sort": [{"timestamp": "desc"}],
-                "query": {"term": {"machine_id.keyword": machine_id}},
-                "_source": ["timestamp", "machine_id", "failure_probability", "alert_level"],
-            }
-        )
-    except httpx.HTTPError as e:
-        return {"error": str(e), "es_url": ES_URL}
+    hits = _es_search(
+        {
+            "size": last_n,
+            "sort": [{"timestamp": "desc"}],
+            "query": {"term": {"machine_id.keyword": machine_id}},
+            "_source": ["timestamp", "machine_id", "failure_probability", "alert_level"],
+        }
+    )
     if not hits:
         return {"machine_id": machine_id, "found": False, "predictions": []}
 
@@ -155,6 +162,7 @@ def get_machine_status(machine_id: str, last_n: int = 10) -> dict:
 
 
 @mcp.tool()
+@guard.guarded(guard.SPEC_ALERTS)
 def list_active_alerts(minutes: int = 15, min_level: str = "KONTUZ") -> dict:
     """Azken N minutuetan alerta izan duten makinak (makinako azken alerta bakarrik).
 
@@ -162,24 +170,21 @@ def list_active_alerts(minutes: int = 15, min_level: str = "KONTUZ") -> dict:
     """
     minutes = max(1, min(minutes, 1440))
     levels = ["LARRIA"] if min_level.upper() == "LARRIA" else list(ALERT_LEVELS)
-    try:
-        hits = _es_search(
-            {
-                "size": 500,
-                "sort": [{"timestamp": "desc"}],
-                "query": {
-                    "bool": {
-                        "filter": [
-                            {"terms": {"alert_level.keyword": levels}},
-                            {"range": {"timestamp": {"gte": f"now-{minutes}m"}}},
-                        ]
-                    }
-                },
-                "_source": ["timestamp", "machine_id", "failure_probability", "alert_level"],
-            }
-        )
-    except httpx.HTTPError as e:
-        return {"error": str(e), "es_url": ES_URL}
+    hits = _es_search(
+        {
+            "size": 500,
+            "sort": [{"timestamp": "desc"}],
+            "query": {
+                "bool": {
+                    "filter": [
+                        {"terms": {"alert_level.keyword": levels}},
+                        {"range": {"timestamp": {"gte": f"now-{minutes}m"}}},
+                    ]
+                }
+            },
+            "_source": ["timestamp", "machine_id", "failure_probability", "alert_level"],
+        }
+    )
 
     latest = {}
     for h in hits:  # berrienetik hasita: makinako lehenengoa da berriena
