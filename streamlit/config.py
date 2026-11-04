@@ -8,5 +8,6 @@ API_USERNAME = os.getenv("API_USERNAME", "nifi")
 API_PASSWORD = os.getenv("API_PASSWORD", "")
 ES_URL = os.getenv("ES_URL", "http://elasticsearch:9200").rstrip("/")
 ES_INDEX = os.getenv("ES_INDEX", "cnc-predictions")
+ES_SENSOR_INDEX = os.getenv("ES_SENSOR_INDEX", "cnc-sensors")
 
 MAILAK = ["OK", "KONTUZ", "LARRIA"]

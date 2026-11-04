@@ -8,7 +8,7 @@ import pandas as pd
 import requests
 import streamlit as st
 
-from config import (API_PASSWORD, API_URL, API_USERNAME, ES_INDEX, ES_URL,
+from config import (API_PASSWORD, API_URL, API_USERNAME, ES_INDEX, ES_SENSOR_INDEX, ES_URL,
                     MAILAK)
 from ui.theme import apply_theme, current_theme, render_theme_switch
 
@@ -343,6 +343,14 @@ div[class*="resizeHandle"] { display: none !important; }
     text-transform: none !important;
 }
 
+/* Reduce los espacios del dashboard sin cambiar el resto de vistas. */
+@media (min-width: 901px) {
+    .block-container:has(.dash-kpis) [data-testid="stVerticalBlock"] { gap: .65rem !important; }
+    .block-container:has(.dash-kpis) .page-header { padding-top: .4rem; padding-bottom: .4rem; margin-bottom: .3rem; }
+    .block-container:has(.dash-kpis) .dash-kpis { margin-bottom: .2rem; }
+    .block-container:has(.dash-kpis) .dash-kpi { padding-top: .6rem; padding-bottom: .55rem; }
+}
+
 /* ── Títulos ── */
 h1 { font-size: 1.2rem !important; font-weight: 700 !important; color: #e8f3ff !important; }
 h2 { font-size: 1rem !important;   font-weight: 600 !important; color: #d4e6f5 !important; }
@@ -595,9 +603,9 @@ def api_egoera() -> tuple[bool, str]:
 
 
 # ── Helpers Elasticsearch ──────────────────────────────────────────────────────
-def es_bilatu(body: dict) -> dict:
+def es_bilatu(body: dict, index: str = ES_INDEX) -> dict:
     try:
-        r = request_retry("POST", f"{ES_URL}/{ES_INDEX}/_search", json=body, timeout=10)
+        r = request_retry("POST", f"{ES_URL}/{index}/_search", json=body, timeout=10)
     except (requests.ConnectionError, requests.Timeout) as exc:
         raise ElasticsearchUnavailable from exc
     if r.status_code == 404:
@@ -633,6 +641,15 @@ def cargar_dashboard() -> list[dict]:
         "sort": [{"timestamp": "desc"}],
         "_source": ["timestamp", "machine_id", "failure_probability", "alert_level", "failure_predicted"],
     })
+
+
+@st.cache_data(ttl=10, show_spinner=False)
+def cargar_sensores_dashboard() -> list[dict]:
+    return es_bilatu({
+        "size": 1000,
+        "sort": [{"timestamp": "desc"}],
+        "_source": ["timestamp", "air_temp_K", "process_temp_K", "vibration_mm_s", "tool_wear_min"],
+    }, index=ES_SENSOR_INDEX)["hits"]["hits"]
 
 
 def es_egoera() -> tuple[bool, int]:
@@ -772,6 +789,26 @@ def altair_config():
     )
 
 
+def dashboard_chart_style(chart):
+    """Aplica los mismos márgenes y colores a todos los gráficos del panel."""
+    light = current_theme() == "light"
+    return (chart.properties(width="container", height=150,
+                             background="#ffffff" if light else "transparent",
+                             autosize=alt.AutoSizeParams(type="fit", contains="padding"),
+                             padding={"left": 8, "right": 16, "top": 8, "bottom": 8})
+            .configure_view(strokeWidth=0, fill="#ffffff" if light else "transparent")
+            .configure_axis(
+                gridColor="#dbe4ef" if light else "rgba(255,255,255,.05)",
+                domainColor="#b9c9d9" if light else "rgba(255,255,255,.08)",
+                tickColor="#b9c9d9" if light else "transparent",
+                labelColor="#405b75" if light else "#8ea8c2",
+                titleColor="#294563" if light else "#c3d5e6",
+                labelPadding=6, titlePadding=10,
+            )
+            .configure_legend(labelColor="#405b75" if light else "#c3d5e6",
+                              titleColor="#294563" if light else "#c3d5e6"))
+
+
 def chart_bar(data, x, y, color_field=None, color_range=None, height=140):
     light = current_theme() == "light"
     base = (
@@ -871,20 +908,45 @@ def page_dashboard():
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    try:
+        sensors = pd.DataFrame([hit["_source"] for hit in cargar_sensores_dashboard()])
+    except ElasticsearchIndexMissing:
+        st.warning(f"El índice de sensores `{ES_SENSOR_INDEX}` todavía no existe.")
+        sensors = pd.DataFrame()
+    except Exception:
+        st.warning("No se han podido cargar los datos de sensores de Elasticsearch.")
+        sensors = pd.DataFrame()
+    if not sensors.empty and "timestamp" in sensors:
+        sensors["timestamp"] = pd.to_datetime(sensors["timestamp"], errors="coerce")
+        sensors = sensors.dropna(subset=["timestamp"])
+        for field in ("air_temp_K", "process_temp_K", "vibration_mm_s", "tool_wear_min"):
+            if field in sensors:
+                sensors[field] = pd.to_numeric(sensors[field], errors="coerce")
 
+    st.caption("Medias cada 5 minutos, calculadas con los últimos 1.000 registros de cada índice.")
     c1, c2 = st.columns(2)
     with c1:
-        st.caption("Distribución de alertas")
-        dist = (df["alert_level"].value_counts()
-                  .reindex(MAILAK).fillna(0)
-                  .rename_axis("nivel").reset_index(name="n"))
-        ch = chart_bar(
-            dist, "nivel:N", "n:Q",
-            color_field="nivel:N",
-            color_range=["#34d399", "#fbbf24", "#fb7185"],
-        )
-        st.altair_chart(ch, use_container_width=True)
+        st.caption("Temperatura media del aire y del proceso")
+        fields = [f for f in ("air_temp_K", "process_temp_K")
+                  if f in sensors and sensors[f].notna().any()]
+        if fields and "timestamp" in sensors:
+            temperatures = sensors.set_index("timestamp").sort_index().resample("5min")[fields].mean()
+            temperatures = temperatures.subtract(273.15).reset_index().melt(
+                id_vars="timestamp", var_name="sensor", value_name="temperatura"
+            ).dropna(subset=["temperatura"])
+            temperatures["sensor"] = temperatures["sensor"].map({"air_temp_K": "Aire", "process_temp_K": "Proceso"})
+            chart = alt.Chart(temperatures).mark_line(point=True).encode(
+                x=alt.X("timestamp:T", title=None),
+                y=alt.Y("temperatura:Q", title="Temperatura media (°C)", scale=alt.Scale(zero=False)),
+                color=alt.Color("sensor:N", title=None, legend=None,
+                                scale=alt.Scale(domain=["Aire", "Proceso"], range=["#7cc8f8", "#087bca"])),
+                tooltip=[alt.Tooltip("timestamp:T", title="Hora"), alt.Tooltip("sensor:N", title="Sensor"),
+                         alt.Tooltip("temperatura:Q", title="Media (°C)", format=".1f")],
+            )
+            st.altair_chart(dashboard_chart_style(chart), use_container_width=True)
+        else:
+            st.info("No hay lecturas de temperatura disponibles en el índice de sensores.")
+        st.caption("Azul claro: aire · azul oscuro: proceso. Ayuda a detectar cambios o aumentos sostenidos.")
 
     with c2:
         st.caption("Evolución del riesgo (media 5 min)")
@@ -894,55 +956,51 @@ def page_dashboard():
             color="#087ea4" if current_theme() == "light" else "#38bdf8"
         ).encode(
             x=alt.X("timestamp:T", title=None),
-            y=alt.Y("risk:Q", title=None),
-        ).properties(width="container", height=140, background="#ffffff" if current_theme() == "light" else "transparent")
-        st.altair_chart(serie_chart.configure_view(strokeWidth=0, fill="#ffffff" if current_theme() == "light" else "transparent").configure_axis(
-            gridColor="#dbe4ef" if current_theme() == "light" else "rgba(255,255,255,.05)",
-            domainColor="#b9c9d9" if current_theme() == "light" else "rgba(255,255,255,.08)",
-            tickColor="#b9c9d9" if current_theme() == "light" else "transparent",
-            labelColor="#405b75" if current_theme() == "light" else "#8ea8c2",
-        ), use_container_width=True)
+            y=alt.Y("risk:Q", title="Riesgo medio", axis=alt.Axis(format="%")),
+        )
+        st.altair_chart(dashboard_chart_style(serie_chart), use_container_width=True)
+        st.caption("Muestra cómo cambia la probabilidad media de fallo estimada por el modelo.")
 
     c3, c4 = st.columns(2)
     with c3:
-        st.caption("Top de máquinas por riesgo")
-        top_maq = (df.groupby("machine_id", as_index=False)["failure_probability"]
-                     .max().nlargest(10, "failure_probability"))
-        light = current_theme() == "light"
+        st.caption("Máquinas con mayor riesgo actual (última predicción)")
+        top_maq = last[["machine_id", "failure_probability"]].nlargest(10, "failure_probability")
         ch2 = (
             alt.Chart(top_maq)
             .mark_bar(cornerRadiusEnd=5)
             .encode(
-                y=alt.Y("machine_id:N", sort="-x", title=None),
+                y=alt.Y("machine_id:N", sort="-x", title=None, axis=alt.Axis(labelOverlap=False)),
                 x=alt.X("failure_probability:Q", title=None, axis=alt.Axis(format="%")),
                 color=alt.Color("failure_probability:Q",
                                 scale=alt.Scale(range=["#38bdf8", "#8b5cf6", "#f43f5e"]),
                                 legend=None),
                 tooltip=["machine_id:N", alt.Tooltip("failure_probability:Q", format=".1%")],
             )
-            .properties(width="container", height=140, background="#ffffff" if light else "transparent")
-            .configure_view(strokeWidth=0, fill="#ffffff" if light else "transparent")
-            .configure_axis(
-                gridColor="#dbe4ef" if light else "rgba(255,255,255,.05)",
-                domainColor="#b9c9d9" if light else "rgba(255,255,255,.08)",
-                tickColor="#b9c9d9" if light else "transparent",
-                labelColor="#405b75" if light else "#8ea8c2",
-            )
         )
-        st.altair_chart(ch2, use_container_width=True)
+        st.altair_chart(dashboard_chart_style(ch2), use_container_width=True)
+        st.caption("Ordena hasta diez máquinas por su última probabilidad de fallo, de mayor a menor.")
 
     with c4:
-        st.caption("Predicciones por probabilidad de fallo")
-        rangos = ["0–20%", "20–40%", "40–60%", "60–80%", "80–100%"]
-        bins = pd.cut(
-            df["failure_probability"],
-            bins=[0, .2, .4, .6, .8, 1],
-            labels=rangos,
-            include_lowest=True,
-        )
-        hdf = bins.value_counts().reindex(rangos, fill_value=0).rename_axis("rango").reset_index(name="n")
-        ch3 = chart_bar(hdf, "rango:N", "n:Q", color_field="n:Q")
-        st.altair_chart(ch3, use_container_width=True)
+        has_vibration = "vibration_mm_s" in sensors and sensors["vibration_mm_s"].notna().any()
+        field = "vibration_mm_s" if has_vibration else "tool_wear_min"
+        unit = "Vibración media (mm/s)" if has_vibration else "Desgaste medio (min)"
+        st.caption("Vibración media" if has_vibration else "Desgaste medio de herramienta")
+        if field in sensors and sensors[field].notna().any() and "timestamp" in sensors:
+            series = (sensors.set_index("timestamp").sort_index().resample("5min")[field]
+                      .mean().dropna().reset_index())
+            chart = alt.Chart(series).mark_line(color="#f59e0b", point=True).encode(
+                x=alt.X("timestamp:T", title=None),
+                y=alt.Y(f"{field}:Q", title=unit, scale=alt.Scale(zero=False)),
+                tooltip=[alt.Tooltip("timestamp:T", title="Hora"),
+                         alt.Tooltip(f"{field}:Q", title=unit, format=".2f")],
+            )
+            st.altair_chart(dashboard_chart_style(chart), use_container_width=True)
+        else:
+            st.info("No hay lecturas disponibles para este gráfico en el índice de sensores.")
+        if has_vibration:
+            st.caption("Muestra la vibración media para identificar cambios en el comportamiento de las máquinas.")
+        else:
+            st.caption("Muestra el desgaste medio de las herramientas. No hay lecturas de vibración disponibles.")
 
 
 # ── Predicciones ──────────────────────────────────────────────────────────────
