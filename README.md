@@ -346,7 +346,7 @@ CNC Guard Claude Code-rekin kontsultatu daiteke hizkuntza naturalean. Bi pieza d
 
 ```bash
 cd mcp-server && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest tests      # probak (6 pasa behar dira)
+.venv/bin/python -m pytest tests      # probak (19 pasa behar dira)
 ```
 
 1. Stack-a martxan egon behar da (`docker compose ps`): MCP-k `localhost:8000` (API) eta `localhost:9200` (Elasticsearch) erabiltzen ditu. `API_PASSWORD` `.env`-tik irakurtzen da.
@@ -392,7 +392,32 @@ Konfigurazioa ez da Claude Code-rentzat bakarrik:
 
 Beste MCP bezero batek: komandoa `mcp-server/.venv/bin/python mcp-server/server.py` (stdio), `API_URL` eta `ES_URL` ingurune-aldagaiekin.
 
-### 12.5 Arazoak
+### 12.5 Segurtasun-arnesa (datu sentikorrak ez dira modelora iristen)
+
+MCP tresnek eta agenteak irakurtzen duten guztia modeloaren testuinguruan sartzen da (eta hornitzailearen APIra joaten da). Hori mugatzeko bi geruza daude.
+
+**1. MCP zerbitzaria (`mcp-server/guard.py`)** — tresna guztien irteera hemendik pasatzen da, ezgaitu ezin den moduan:
+
+| Neurria | Zer egiten du |
+|---|---|
+| Zerrenda zuria | Eremu ezagunak soilik pasatzen dira (`machine_id`, `timestamp`, `failure_probability`, `alert_level`, `status`...), mota eta formatu zehatzekin. Gainerakoa baztertzen da, API edo Elasticsearch-ek eremu berriak gehitzen badituzte ere. |
+| Akatsak | Salbuespenen testua ez da inoiz itzultzen (URLak, goiburuak edo kredentzialak izan ditzake): `http_401`, `timeout`, `service_unreachable`... kodeak soilik. `api_url` eta `es_url` ere ez dira itzultzen. |
+| Ezkutatzea | Balio guztietan JWT, `Bearer`, Telegram tokenak, `pasahitza=...`, `user:pass@host`, posta-helbideak, IPak, token luzeak eta `.env`-ko sekretuen balio literalak `[REDACTED]` bihurtzen dira. |
+| Sarrera-balidazioa | `machine_id` (`[A-Za-z0-9_-]{1,32}`) eta zenbakiak egiaztatzen dira eskaerarik egin aurretik. |
+| Fail closed | Irteerak eskema betetzen ez badu, `blocked_by_guard` itzultzen da, ezer filtratu gabe. |
+
+Stderr-era kontagailuak soilik idazten dira (`guard[...]: ezkutatuak=N baztertuak=M`), inoiz edukirik ez.
+
+**2. Claude Code (`.claude/settings.json` + `.claude/hooks/block_secrets.py`)** — agenteak ezin ditu sekretuak beste bideetatik irakurri. Blokeatzen dira: `.env*` fitxategiak (`.env.example` izan ezik), gako eta ziurtagiri pribatuak, `~/.ssh`, `cat .env`, `printenv`, `docker inspect`, `docker compose config`, `docker exec ... env` eta antzekoak.
+
+Mugak (garrantzitsua):
+
+- Sentsore-datuak eta alertak (makina, probabilitatea, maila) modelora **iristen dira**: MCP-ren helburua horixe da. Hori ere saihestu nahi bada, ez erabili MCP zerbitzaria.
+- Hook-a ahalegin onenekoa da, ez bermea: ez ditu leku guztiak estaltzen (adib. sekretuak beste fitxategi batean idatzita badaude). Ez gorde sekretuak agenteak ikus ditzakeen fitxategietan.
+- Codex-ek MCP geruza bera erabiltzen du (zerbitzari bera), baina `.claude/settings.json` ez da Codex-entzat: konfiguratu bere sandbox- eta onarpen-politika.
+- Elkarrizketan dagoeneko agertu den informazioa ezin da atzera bota.
+
+### 12.6 Arazoak
 
 | Sintoma | Konponbidea |
 |---|---|
