@@ -10,7 +10,8 @@ from cnc_ml.columns import RAW_FEATURES
 
 log = logging.getLogger(__name__)
 
-# Alerta-mailen mugak: OK <= %50 < KONTUZ <= %80 < LARRIA
+# Alerta-mailen mugak: OK <= %15 < KONTUZ <= %80 < LARRIA
+# %15: atalase baxua, hutsegite bat ez detektatzearen kostua handiagoa delako (ikus 02_training_ML.ipynb)
 FAILURE_THRESHOLD = 0.15
 LARRIA_THRESHOLD = 0.8
 

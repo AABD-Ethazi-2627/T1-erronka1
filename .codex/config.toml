@@ -1,0 +1,6 @@
+# Servidor MCP de CNC Guard para Codex (solo lectura).
+# Requiere el venv de mcp-server/ y ejecutar Codex desde la raíz del proyecto.
+[mcp_servers.cnc-guard]
+command = "mcp-server/.venv/bin/python"
+args = ["mcp-server/server.py"]
+env = { API_URL = "http://localhost:8000", ES_URL = "http://localhost:9200" }
