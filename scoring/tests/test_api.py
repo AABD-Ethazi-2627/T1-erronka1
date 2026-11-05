@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 from tests.conftest import SAMPLE
@@ -51,6 +53,9 @@ def test_predict_alerta_mailak(client, token, fake_model, prob, maila, predicted
     assert body["failure_predicted"] is predicted
     assert body["machine_id"] == "CNC-039"
     assert body["timestamp"] == SAMPLE["timestamp"]
+    assert body["temp_diff_K"] == pytest.approx(9.6)
+    assert body["power_W"] == pytest.approx(38.6 * 1587 * 2 * math.pi / 60)
+    assert body["wear_torque"] == pytest.approx(124 * 38.6)
 
 
 def test_predict_timestamp_gabe(client, token, fake_model):
