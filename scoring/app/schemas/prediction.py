@@ -44,3 +44,6 @@ class Predikzioa(BaseModel):
     failure_predicted: bool
     failure_probability: float
     alert_level: Literal["OK", "KONTUZ", "LARRIA"]
+    temp_diff_K: float
+    power_W: float
+    wear_torque: float
