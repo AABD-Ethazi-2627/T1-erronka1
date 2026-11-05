@@ -793,16 +793,14 @@ with st.sidebar:
         ("·", "Alertas", "Alertas"),
     ]
 
+    def navegar_a(key):
+        st.session_state.atal = key
+
     for icon, label, key in nav:
         active = st.session_state.atal == key
         marker = ""
-        clicked = st.button(f"{marker}  {label}", key=f"nav_{key}", use_container_width=True,
-                            type="primary" if active else "secondary")
-        if clicked:
-            st.session_state.atal = key
-            # Re-renderiza también la barra para que el estado activo cambie
-            # en el mismo clic, no en la siguiente interacción.
-            st.rerun()
+        st.button(f"{marker}  {label}", key=f"nav_{key}", use_container_width=True,
+                  type="primary" if active else "secondary", on_click=navegar_a, args=(key,))
 
     refresh_options = {
         " ": 0,
