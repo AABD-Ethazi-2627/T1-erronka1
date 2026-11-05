@@ -168,10 +168,9 @@ curl -s 'localhost:9200/_cat/indices/cnc-*?v'      # docs.count igotzen ari da?
 
 http://localhost:8501 — `.env`-ko `API_USERNAME` / `API_PASSWORD` erabiltzen ditu APIan autentifikatzeko (ez du ezer gehiago konfiguratu behar).
 
-- **Iragarpen eskuzkoa:** sentsore-balioak sartu eta Scoring API-ari (`/predict`) galdetu. Alerta maila (`OK` / `KONTUZ` / `LARRIA`) eta hutsegite-probabilitatea erakusten ditu.
-- **Monitorizazioa:** `cnc-predictions` indizeko datuak (NiFi-ren *Streaming* flow-ak idazten ditu): alerta mailen kopuruak, probabilitatea denboran, arriskuko makinak eta azken iragarpenak.
-  Indizea oraindik ez badago, mezu bat agertzen da; flow-a abiarazi eta datuak iristean agertuko dira.
-  Datuak hutsik agertzen badira, albo-barrako denbora-tartea `Guztia` jarri (timestamp-a simuladoreak jartzen du).
+- **Iragarpen eskuzkoa:** sentsore-balioak sartu eta Scoring API-ari (`/predict`) galdetu. Alerta-mailaz eta hutsegite-probabilitateaz gain, uneko irakurketaren tenperatura-aldea, potentzia mekanikoa eta higadura × torkea erakusten ditu. Adierazleak ez dira matxuraren kausa baieztatuak.
+- **Monitorizazioa:** `cnc-predictions` indizeko azken irakurketak makinaka alderatzen ditu. AI4I datuak snapshot-ak dira: iritsiera-denborak ez du makina baten benetako bilakaera adierazten. Aurreko iragarpenek ez dute zertan adierazle berririk eduki; API eguneratuaren ondoko irakurketek izango dituzte.
+- Aldagai fisikoen eta `machine_type`-ren ebaluazio konparatiboa: [scoring/EVALUACION_FEATURES.md](scoring/EVALUACION_FEATURES.md).
 
 Kodea aldatu ondoren: `docker compose up -d --build streamlit`.
 
