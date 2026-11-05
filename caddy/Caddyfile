@@ -1,0 +1,55 @@
+# CNC Guard — Caddy: HTTPS erreverse proxy-a zerbitzu guztientzat.
+#
+# Ingurune-aldagaiak (docker-compose.prod.yml-ek pasatzen ditu, .env-n aldatu daitezke):
+#   CNC_DOMAIN  oinarrizko domeinua (lehenetsia: cnc.localhost)
+#   CADDY_TLS   `internal` (Caddy-ren CA lokala, lehenetsia) edo ACME-rako posta-helbide bat
+#               (domeinu publiko bat badago eta 80/443 ataka internetetik irisgarri)
+#
+# Zerbitzu bakoitza bere azpidomeinuan:
+#   https://streamlit.<CNC_DOMAIN>   panela
+#   https://kibana.<CNC_DOMAIN>      Kibana
+#   https://nifi.<CNC_DOMAIN>        NiFi
+#   https://api.<CNC_DOMAIN>         Scoring API (/docs, /health...)
+#
+# Elasticsearch eta Kafka ez dira argitaratzen: ES-k segurtasuna desaktibatuta dauka.
+
+(cnc_tls) {
+	tls {$CADDY_TLS:internal}
+}
+
+{$CNC_DOMAIN:cnc.localhost} {
+	import cnc_tls
+	redir https://streamlit.{$CNC_DOMAIN:cnc.localhost}{uri} permanent
+}
+
+streamlit.{$CNC_DOMAIN:cnc.localhost} {
+	import cnc_tls
+	# WebSocket-ak (Streamlit-en eguneraketak) automatikoki bideratzen dira.
+	reverse_proxy streamlit:8501
+}
+
+kibana.{$CNC_DOMAIN:cnc.localhost} {
+	import cnc_tls
+	reverse_proxy kibana:5601
+}
+
+api.{$CNC_DOMAIN:cnc.localhost} {
+	import cnc_tls
+	reverse_proxy scoring-api:8000
+}
+
+nifi.{$CNC_DOMAIN:cnc.localhost} {
+	import cnc_tls
+	# NiFi HTTPS-n dabil ziurtagiri autosinatuarekin (SAN: localhost + edukiontziaren ID-a, aldakorra).
+	# Jetty-k SNI eta Host goiburua bat datozela egiaztatzen du, beraz biak `localhost` bihurtzen dira
+	# eta ziurtagiriaren egiaztapena saltatzen da (Docker sare barnean).
+	# Jatorrizko domeinua X-Forwarded-Host bidez doa: docker-compose.prod.yml-ek NIFI_WEB_PROXY_HOST
+	# ezartzen du hura onartzeko (bestela NiFi-k 421 "Invalid Proxy Host" ematen du).
+	reverse_proxy https://nifi:8443 {
+		header_up Host localhost:8443
+		transport http {
+			tls_server_name localhost
+			tls_insecure_skip_verify
+		}
+	}
+}

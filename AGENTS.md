@@ -13,6 +13,7 @@ Herramientas: `model_health`, `list_active_alerts`, `get_machine_status`, `predi
 - Codex: configurado en `.codex/config.toml`.
 - Otros clientes: comando `mcp-server/.venv/bin/python mcp-server/server.py` (stdio), con `API_URL=http://localhost:8000` y `ES_URL=http://localhost:9200`.
 - Instalación: `cd mcp-server && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
+- Seguridad: nunca leas ni muestres secretos (ficheros `.env` salvo el `.example`, claves, `docker inspect`, `docker compose config`, variables de entorno). `.claude/hooks/block_secrets.py` lo bloquea; no lo evites. La salida del MCP pasa por `mcp-server/guard.py` (lista blanca + redacción): si añades un campo a una tool, añádelo allí.
 - Un resultado de 0 alertas no significa "sin riesgo": puede ser que no lleguen datos. Compruébalo con `docker compose ps` y los logs de Filebeat/NiFi.
 
 ## Skills
@@ -24,6 +25,6 @@ Fuente en `.claude/skills/<nombre>/SKILL.md`, con copia real en `.agents/skills/
 | `pdf-media` | Dado un PDF: extraer sus imágenes a `docs/media/<pdf>/` y referenciarlas en Markdown |
 
 ## Convenciones
-- Los umbrales de alerta (OK ≤ 0.5, KONTUZ 0.5–0.8, LARRIA > 0.8) viven en `scoring/app/services/model.py`.
+- Los umbrales de alerta (OK ≤ 0.15, KONTUZ 0.15–0.8, LARRIA > 0.8) viven en `scoring/app/services/model.py`.
 - No uses `failure_TWF/HDF/PWF/OSF/RNF` como features del modelo (data leakage).
 - Tests: `mcp-server/.venv/bin/python -m pytest mcp-server/tests`.
