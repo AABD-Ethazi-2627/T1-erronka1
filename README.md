@@ -341,7 +341,18 @@ cnc-guard/
 
 ## 11. Dokumentazioa
 
-Zerbitzu bakoitzaren dokumentazio zehatza `docs/` karpetan dago: Filebeat, Kafka, NiFi, Kibana, Streamlit eta ML ereduaren notebook-a. Kibana-ko dashboard-ak inportatzeko: `kibana/export.ndjson` (Stack Management → Saved Objects → Import).
+> **Garrantzitsua:** zerbitzu bakoitzaren dokumentazio zehatza `docs/` karpetan dago. Proiektua ulertzeko, mantentzeko edo ebaluatzeko, irakurri dokumentu hauek:
+
+| Dokumentua | Edukia |
+|---|---|
+| [`docs/filebeat_dokumentazioa.md`](docs/filebeat_dokumentazioa.md) | Filebeat: CSV fitxategiak irakurri eta Kafka-ra bidaltzea |
+| [`docs/kafka_dokumentazioa.md`](docs/kafka_dokumentazioa.md) | Kafka: `cnc-sensors-raw` topikoa eta konfigurazioa |
+| [`docs/nifi_dokumentazioa.md`](docs/nifi_dokumentazioa.md) | NiFi: flow-ak, Scoring API deia eta Elasticsearch-en idazketa |
+| [`docs/kibana_dokumentazioa.md`](docs/kibana_dokumentazioa.md) | Kibana: dashboard-ak eta bistaratzeak (txosten teknikoa) |
+| [`docs/streamlit_documentazioa.md`](docs/streamlit_documentazioa.md) | Streamlit panela: monitorizazioa, alertak eta iragarpenak |
+| [`docs/ml_eredua_notebook_dokumentazioa.md`](docs/ml_eredua_notebook_dokumentazioa.md) | ML eredua: entrenamendu-notebook-aren dokumentazioa |
+
+Pantaila-argazkiak `docs/media/` karpetan daude. Kibana-ko dashboard-ak inportatzeko: `kibana/export.ndjson` (Stack Management → Saved Objects → Import).
 
 ## 12. Erronkaren dokumentua
 
