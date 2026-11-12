@@ -10,7 +10,9 @@ T1-erronka1/
 ├── 
 │   
 ├── notebooks/
-│   └── 02_training_ML.ipynb        # Modeloaren entrenamendua
+│   ├── 02_training_ML.ipynb        # Modeloaren entrenamendua
+|   └── lightgbm_Training.ipynb     # Probatutako beste modeloa
+│   └── Xgboots_Training.ipynb      # Probatutako beste modeloa 
 ├── models/
 │   ├── cnc_failure_model.pkl       # Model producction (pipeline sklearn osoa)
 │   └── backups/                    # Modeloaren aurreko bertsioak
