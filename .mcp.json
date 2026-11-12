@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "cnc-guard": {
+      "command": "mcp-server/.venv/bin/python",
+      "args": ["mcp-server/server.py"],
+      "env": {
+        "API_URL": "http://localhost:8000",
+        "ES_URL": "http://localhost:9200"
+      }
+    }
+  }
+}

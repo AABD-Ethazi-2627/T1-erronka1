@@ -1,5 +1,8 @@
-fastapi==0.111.0
-uvicorn[standard]==0.30.1
-joblib==1.4.2
-scikit-learn==1.5.0
-pandas==2.2.2
+fastapi
+uvicorn[standard]
+joblib
+scikit-learn
+pandas
+matplotlib
+PyJWT
+python-multipart
