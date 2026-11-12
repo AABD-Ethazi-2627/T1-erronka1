@@ -793,16 +793,14 @@ with st.sidebar:
         ("·", "Alertas", "Alertas"),
     ]
 
+    def navegar_a(key):
+        st.session_state.atal = key
+
     for icon, label, key in nav:
         active = st.session_state.atal == key
         marker = ""
-        clicked = st.button(f"{marker}  {label}", key=f"nav_{key}", use_container_width=True,
-                            type="primary" if active else "secondary")
-        if clicked:
-            st.session_state.atal = key
-            # Re-renderiza también la barra para que el estado activo cambie
-            # en el mismo clic, no en la siguiente interacción.
-            st.rerun()
+        st.button(f"{marker}  {label}", key=f"nav_{key}", use_container_width=True,
+                  type="primary" if active else "secondary", on_click=navegar_a, args=(key,))
 
     refresh_options = {
         " ": 0,
@@ -955,6 +953,68 @@ def rangos_estables_indicador(field, values):
     return saved, pd.DataFrame({"inicio": edges[:-1], "fin": edges[1:], "maquinas": counts})
 
 
+@st.cache_data(ttl=10, show_spinner=False)
+def cargar_historial_maquina(machine_id: str, index: str, fields: tuple, hasta: str | None) -> pd.DataFrame:
+    """Consulta las últimas lecturas de una máquina fuera de los filtros de la página."""
+    filters = [{"term": {"machine_id.keyword": machine_id}}]
+    if hasta:
+        filters.append({"range": {"timestamp": {"lte": hasta}}})
+    hits = es_bilatu({
+        "size": 500, "sort": [{"timestamp": "desc"}],
+        "query": {"bool": {"filter": filters}},
+        "_source": ["timestamp", *fields],
+    }, index=index)["hits"]["hits"]
+    df = pd.DataFrame([hit.get("_source", {}) for hit in hits])
+    if df.empty or "timestamp" not in df:
+        return pd.DataFrame()
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
+    for field in fields:
+        if field in df:
+            df[field] = pd.to_numeric(df[field], errors="coerce")
+    return df.dropna(subset=["timestamp"]).sort_values("timestamp")
+
+
+def mostrar_historial_maquina(machine_id):
+    st.markdown("**Evolución temporal**")
+    st.caption("Hasta 500 lecturas más recientes por fuente, independientemente de los filtros del explorador. Fechas en UTC.")
+    snapshot = obtener_instantanea()
+    hasta = snapshot.get("captured_at") if snapshot else None
+    groups = (
+        (ES_INDEX, "predicciones", (("failure_probability", "Probabilidad de fallo", "%"),)),
+        (ES_SENSOR_INDEX, "sensores", (("air_temp_K", "Temperatura del aire", "K"),
+                                      ("process_temp_K", "Temperatura del proceso", "K"),
+                                      ("rpm", "Velocidad de rotación", "rpm"),
+                                      ("torque_Nm", "Par motor", "Nm"),
+                                      ("tool_wear_min", "Desgaste de herramienta", "min"))),
+    )
+    for index, source, metrics in groups:
+        try:
+            history = cargar_historial_maquina(machine_id, index, tuple(m[0] for m in metrics), hasta)
+        except ElasticsearchIndexMissing:
+            st.info(f"El índice de {source} aún no está disponible.")
+            continue
+        except (ElasticsearchUnavailable, requests.RequestException):
+            st.warning(f"No se pudo cargar el historial de {source}.")
+            continue
+        available = [(field, label, unit) for field, label, unit in metrics
+                     if field in history and history[field].notna().any()]
+        if not available:
+            st.info(f"No hay historial de {source} para esta máquina.")
+            continue
+        for field, label, unit in available:
+            data = history[["timestamp", field]].dropna().copy()
+            if field == "failure_probability":
+                data[field] *= 100
+            st.caption(f"{label} · {unit}")
+            chart = alt.Chart(data).mark_line(point=True, color="#38bdf8").encode(
+                x=alt.X("timestamp:T", title="Fecha y hora (UTC)", scale=alt.Scale(type="utc")),
+                y=alt.Y(f"{field}:Q", title=unit, scale=alt.Scale(zero=False)),
+                tooltip=[alt.Tooltip("timestamp:T", title="Fecha (UTC)"),
+                         alt.Tooltip(f"{field}:Q", title=f"{label} ({unit})", format=".2f")],
+            )
+            st.altair_chart(dashboard_chart_style(chart, height=160), use_container_width=True)
+
+
 # ── Dashboard ──────────────────────────────────────────────────────────────────
 def seleccionar_maquina(chart_key):
     """Recoge la selección del gráfico antes de volver a dibujar la página."""
@@ -992,6 +1052,7 @@ def mostrar_maquina(machine_id, latest, selected_row=None):
             st.metric(label, f"{value:,.1f} {unit}" if pd.notna(value) else "Sin datos")
             st.caption(f"Mediana: {median:,.1f} {unit}" if pd.notna(median) else "Mediana no disponible")
     st.caption("Los indicadores describen una lectura individual y no confirman la causa de una avería.")
+    mostrar_historial_maquina(machine_id)
 
 
 def seleccionar_fila(widget_key, rows):
@@ -1317,7 +1378,7 @@ def page_datos():
     machines_col, distribution_col = st.columns([1.4, 1], gap="large")
     with machines_col:
         st.markdown("**Abrir datos de una máquina**")
-        st.caption("Pulsa un nombre para consultar su lectura más reciente entre los registros filtrados.")
+        st.caption("Pulsa un nombre para consultar su lectura más reciente y su evolución temporal.")
         machine_names = sorted(df["machine_id"].dropna().astype(str).unique().tolist())
         pages = max(1, (len(machine_names) + 19) // 20)
         page = min(max(st.session_state.get("datos_machine_page_number", 1), 1), pages)
