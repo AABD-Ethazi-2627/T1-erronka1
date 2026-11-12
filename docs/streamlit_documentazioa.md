@@ -1,114 +1,114 @@
-# 🛠️ NEXO CNC — Panel Streamlit
+# NEXO CNC — Streamlit Panela
 
-Aplicación web interactiva desarrollada con **Streamlit** para la monitorización en tiempo real del estado de las máquinas CNC, visualización de métricas de telemetría, gestión de alertas y simulación manual de predicciones.
-
----
-
-## 📌 Funcionalidades y Vistas
-
-La aplicación se compone de 4 secciones accesibles desde la barra lateral:
-
-### 1. 📊 Dashboard (Estado de las máquinas)
-* **KPIs globales**: Total de máquinas monitorizadas, número de alertas activas, riesgo medio estimado de la flota y temperatura ambiental.
-* **Lista priorizada de máquinas**: Ordenadas de mayor a menor riesgo de avería según la última predicción.
-* **Detalle por máquina**: Al seleccionar un equipo, muestra:
-  * Gráficas temporales interactivas (desgaste de herramienta, par motor, temperaturas).
-  * Rangos estables de trabajo frente a los valores actuales.
-  * Relación entre par y desgaste (`wear_torque`) y salto térmico (`temp_diff_K`).
-
-### 2. ⚡ Predicción Manual (Simulador)
-* Formulario interactivo para introducir parámetros operativos de una máquina:
-  * Tipo de máquina (`L`, `M`, `H`)
-  * Temperatura ambiente y del proceso (K)
-  * Velocidad rotacional (RPM)
-  * Par de torsión (Nm)
-  * Desgaste de herramienta (min)
-* Calcula en tiempo real la probabilidad de fallo y el nivel de alerta correspondiente consultando la Scoring API.
-
-### 3. 🔍 Explorador de Datos
-* Tabla interactiva con el historial de predicciones y telemetría.
-* Filtros por nivel de alerta (`OK`, `KONTUZ`, `LARRIA`) y ventana de tiempo.
-* Visualización detallada de registros individuales en formato tabular.
-
-### 4. 🚨 Centro de Alertas
-* Vista enfocada en incidencias activas clasificadas en:
-  * 🟡 **KONTUZ** (Riesgo medio / desgaste preventivo)
-  * 🔴 **LARRIA** (Riesgo crítico / parada recomendada)
-* Historial de eventos anómalos para el equipo de mantenimiento.
+CNC makinen denbora errealeko egoera monitorizatzeko, sentsoreen telemetria bistaratzeko, alertak kudeatzeko eta Machine Learning bidezko iragarpenak eskuz simulatzeko web aplikazio interaktiboa, **Streamlit** erabiliz garatua.
 
 ---
 
-## 🔌 Orígenes de Datos
+## Funtzionalitateak eta Atal Nagusiak
 
-La aplicación de Streamlit obtiene su información de dos servicios:
+Aplikazioak alboko barratik eskuragarri dauden 4 atal nagusi ditu:
 
-| Origen | Endpoint por defecto | Uso en la aplicación |
+### 1. Aginte-panela (Makinen egoera)
+* **KPI orokorrak**: Monitorizatutako makina kopurua, alerta aktiboak, flotaren batez besteko arrisku-maila eta giro-tenperatura.
+* **Makinen lehentasun-zerrenda**: Azken iragarpenaren arabera huts egiteko arriskurik handiena duten makinak lehenetsita.
+* **Makinaren xehetasuna**: Makina bat hautatzean, honako datuak erakusten dira:
+  * Grafiko tenporal interaktiboak (erremintaren higadura, motorraren torkea, tenperaturak).
+  * Lan-eremu egonkorrak uneko balioen aurrean.
+  * Torkearen eta higaduraren arteko erlazioa (`wear_torque`) eta jauzi termikoa (`temp_diff_K`).
+
+### 2. Eskuzko Iragarpena (Simulagailua)
+* Makina baten parametro operatiboak eskuz sartzeko formulario interaktiboa:
+  * Makina mota (`L`, `M`, `H`)
+  * Giro-tenperatura eta prozesu-tenperatura (K)
+  * Errotazio-abiadura (RPM)
+  * Torkea (Nm)
+  * Erremintaren higadura (min)
+* Scoring API-a kontsultatuz, huts egiteko probabilitatea eta dagokion alerta-maila denbora errealean kalkulatzen ditu.
+
+### 3. Datuen Esploratzailea
+* Elasticsearch-en gordetako iragarpenen eta telemetriaren erregistroen taula interaktiboa.
+* Iragazkiak alerta-mailaren arabera (`OK`, `KONTUZ`, `LARRIA`) eta denbora-leihoaren arabera.
+* Erregistro bakoitzaren datu zehatzak taula formatuan kontsultatzeko aukera.
+
+### 4. Alerta Zentroa
+* Gorabehera aktiboetara bideratutako atala, bi larritasun-mailatan sailkatuta:
+  * **KONTUZ** (Arrisku ertaina / prebentziozko higadura)
+  * **LARRIA** (Arrisku kritikoa / berehalako geldialdia gomendatua)
+* Mantentze-lanetako taldearentzako gertakari anomaloen erregistro historikoa.
+
+---
+
+## Datu-iturburuak
+
+Streamlit aplikazioak bi zerbitzutatik jasotzen ditu datuak:
+
+| Zerbitzua | Helmuga lehenetsia | Erabilera aplikazioan |
 |---|---|---|
-| **Elasticsearch** | `http://elasticsearch:9200` | Consulta de índices para el Dashboard, gráficas, tablas y alertas: <br>• `cnc-predictions` (predicciones y niveles de alerta)<br>• `cnc-sensors` (telemetría directa de sensores) |
-| **Scoring API** | `http://scoring-api:8000` | • `GET /health`: Estado del modelo ML en la barra lateral.<br>• `POST /predict`: Inferencia en tiempo real del formulario manual. |
+| **Elasticsearch** | `http://elasticsearch:9200` | Aginte-panela, grafikoak, taulak eta alertak elikatzeko:<br>• `cnc-predictions` (ML iragarpenak eta alerta-mailak)<br>• `cnc-sensors` (sentsoreen telemetria gordina) |
+| **Scoring API** | `http://scoring-api:8000` | • `GET /health`: Modeloaren egoera alboko barran egiaztatzea.<br>• `POST /predict`: Eskuzko formularioaren denbora errealeko inferentzia. |
 
 ---
 
-## ⚙️ Variables de Entorno
+## Ingurune-aldagaiak eta Konfigurazioa
 
-Configurables en el entorno o archivo `.env`:
+Konfigurazioa `.env` fitxategian edo sistemaren ingurune-aldagaietan definitzen da (`config.py` fitxategiaren bidez kudeatua):
 
-| Variable | Valor por defecto | Descripción |
+| Aldagaia | Balio lehenetsia | Deskribapena |
 |---|---|---|
-| `ES_URL` | `http://elasticsearch:9200` | Dirección del servidor Elasticsearch |
-| `ES_INDEX` | `cnc-predictions` | Índice de predicciones de fallo |
-| `ES_SENSOR_INDEX` | `cnc-sensors` | Índice de lecturas de sensores |
-| `API_URL` | `http://scoring-api:8000` | Dirección de la API de inferencia FastAPI |
-| `API_USERNAME` | `nifi` | Usuario para autenticación en la API |
-| `API_PASSWORD` | *(vacío)* | Contraseña para autenticación en la API |
+| `ES_URL` | `http://elasticsearch:9200` | Elasticsearch zerbitzariaren helbidea |
+| `ES_INDEX` | `cnc-predictions` | Huts-egiteen iragarpenen indizea |
+| `ES_SENSOR_INDEX` | `cnc-sensors` | Sentsoreen datu gordinen indizea |
+| `API_URL` | `http://scoring-api:8000` | FastAPI inferentzia-zerbitzuaren helbidea |
+| `API_USERNAME` | `nifi` | APIra konektatzeko zerbitzu-erabiltzailea |
+| `API_PASSWORD` | *(hutsik)* | APIra konektatzeko pasahitza |
 
 ---
 
-## 🚀 Puesta en Marcha
+## Abiarazte Gida
 
-### Con Docker Compose
+### Docker Compose bidez
 
 ```bash
-# Iniciar únicamente el contenedor de Streamlit
+# Streamlit zerbitzua bakarrik abiarazteko
 docker compose -f docker-compose.dev.yml up -d streamlit
 ```
-Acceso en el navegador: **`http://localhost:8501`**
+Nabigatzailetik sartzeko helbidea: **`http://localhost:8501`**
 
-### En Local (sin Docker)
+### Lokalean (Docker gabe)
 
 ```bash
-# 1. Instalar dependencias
+# 1. Beharrezko liburutegiak instalatu
 pip install -r streamlit/requirements.txt
 
-# 2. Configurar variables (si difieren de las por defecto)
+# 2. Ingurune-aldagaiak ezarri (beharrezkoa bada)
 export ES_URL="http://localhost:9200"
 export API_URL="http://localhost:8000"
-export API_PASSWORD="tu_password"
+export API_PASSWORD="zure_pasahitza"
 
-# 3. Lanzar Streamlit
+# 3. Streamlit abiarazi
 streamlit run streamlit/app.py
 ```
 
 ---
 
-## 🎨 Características Adicionales
+## Ezaugarri Gehigarriak
 
-* **Tema Claro / Oscuro**: Selector de tema en la barra lateral con persistencia durante la sesión.
-* **Congelar Datos (Instantánea)**: Botón para pausar la actualización automática de datos y permitir el análisis estático de un incidente sin que se muevan los gráficos.
-* **Caché Eficiente**: Uso de `@st.cache_data` con tiempos de expiración controlados para evitar sobrecargar Elasticsearch.
+* **Gai Iluna / Argia**: Alboko barran aldagarria den itxura-hautatzailea, saioan zehar hautatutako egoera mantentzen duena.
+* **Datuen Argazkia (Instantánea)**: Datuen eguneraketa automatikoa aldi baterako gelditzeko aukera, gertakari baten azterketa estatikoa egiteko taulak mugitu gabe.
+* **Katxe Optimizatua**: `@st.cache_data` dekoratzailearen bidezko kontsultak, Elasticsearch gainkargatu gabe erantzun-denbora azkarrak bermatzeko.
 
 ---
 
-## 📁 Estructura del Módulo
+## Moduluaren Egitura
 
 ```text
 streamlit/
-├── app.py              # Entrada principal, router de navegación y vistas
-├── config.py           # Lectura de variables de entorno y constantes
-├── requirements.txt    # Librerías necesarias (streamlit, requests, altair, pandas...)
-├── Dockerfile          # Imagen para el despliegue en contenedor
+├── app.py              # Sarrera nagusia, nabigazio-bideratzailea eta orriak
+├── config.py           # Ingurune-aldagaien irakurketa eta konstanteak
+├── requirements.txt    # Python menpekotasunak (streamlit, requests, altair, pandas...)
+├── Dockerfile          # Edukiontzia sortzeko fitxategia
 ├── ui/
 │   ├── __init__.py
-│   └── theme.py        # Control de estilos CSS y temas claro/oscuro
-└── README.md           # Esta documentación
+│   └── theme.py        # CSS estiloak eta gai ilun/argiaren kudeaketa
+└── README.md           # Moduluaren dokumentazio teknikoa
 ```
