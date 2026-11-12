@@ -91,3 +91,44 @@ Makina batzuek hainbat hutsegite mota izan ditzakete aldi berean; horregatik, hu
 - **Geratzen diren 6 hutsegiteak:** 0,00 eta 0,12 arteko probabilitateak dituzte. Horiek detektatzeko, ia makina guztiei alarma eman beharko litzaieke, eta horrek aurreztutakoa baino gehiago kostatuko luke.
 
 - **TWF motako hutsegiteetarako benetako irtenbidea:** mantentze-lan prebentiboak egitea eta erreminta erabilerako 200 minutu bete aurretik aldatzea.
+
+## Ereduaren erabilera segurua: `.env`, NiFi tokena eta MCP arnesa
+
+Eredua Scoring API-ren (FastAPI) bidez zerbitzatzen da. Hori guztia babesteko, sekretuak ez daude kodean ez eta `docker-compose.*.yml`-n: `.env` fitxategian daude (`.gitignore`-n dago, ez da git-era igotzen). Txantiloia `.env.example` da.
+
+### `.env` aldagaiak
+
+| Aldagaia | Zertarako |
+|---|---|
+| `JWT_SECRET` | Scoring API-k JWT tokenak sinatzeko (`openssl rand -hex 32`-rekin sortua) |
+| `API_USERNAME` / `API_PASSWORD` | NiFi-k (eta MCP zerbitzariak) API-n autentifikatzeko erabiltzen duen kontua |
+| `NIFI_USERNAME` / `NIFI_PASSWORD` | NiFi web UI-ra sartzeko (gutxienez 12 karaktere) |
+| `SMB_IP` / `SMB_USERNAME` / `SMB_PASSWORD` | Simuladorearen Samba karpeta |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | (Aukerakoa) alertak Telegram-era bidaltzeko |
+
+Pasahitzak eta `JWT_SECRET` derrigorrezkoak dira: falta badira, `docker compose` errorearekin gelditzen da.
+
+### NiFi → Scoring API autentifikazio-fluxua (API tokena)
+
+`/predict` endpoint-a babestuta dago; NiFi-k tokena lortu behar du aurrena:
+
+1. NiFi-ko `Scoring API — OAuth2 tokenak` controller service-ak (`StandardOauth2AccessTokenProvider`) `POST http://scoring-api:8000/auth/token` deitzen du, `Grant Type = password` eta `.env`-ko `API_USERNAME` / `API_PASSWORD` erabilita.
+2. Scoring API-k kredentzialak egiaztatzen ditu eta `JWT_SECRET`-ekin sinatutako JWT bat itzultzen du.
+3. `InvokeHTTP — scoring-api /predict` prozesadoreak token hori bidaltzen du (`Authorization: Bearer ...`) eta iragarpena jasotzen du.
+4. Emaitza Elasticsearch-eko `cnc-predictions` indizean gordetzen da.
+
+NiFi-k ez ditu pasahitzak flow-en JSON-ean esportatzen; horregatik, `nifi-flows/CNC_Guard_Streaming.json` inportatu ondoren, `API_PASSWORD` eskuz sartu behar da controller service-an. Xehetasunak: [`nifi_dokumentazioa.md`](nifi_dokumentazioa.md).
+
+### MCP zerbitzaria eta segurtasun-arnesa
+
+Eredua Claude Code-tik kontsultatzeko `cnc-guard` MCP zerbitzaria (irakurketa-soilik) dago: `model_health`, `list_active_alerts`, `get_machine_status` eta `predict_failure`. Datu sentikorrak modelora ez iristeko, bi geruzako arnesa jarri dugu:
+
+1. **`mcp-server/guard.py`** — tresna guztien irteera hemendik pasatzen da:
+   - Eremu ezagunen zerrenda zuria (gainerakoa baztertzen da).
+   - Akatsetan kodeak soilik itzultzen dira (`http_401`, `timeout`...), inoiz salbuespenen testua, URLak edo kredentzialak ez.
+   - Ezkutatzea (`[REDACTED]`): JWT, `Bearer`, Telegram tokenak, pasahitzak, posta-helbideak, IPak eta sekretuen balio literalak.
+   - `machine_id` eta zenbakien sarrera-balidazioa.
+   - *Fail closed*: irteerak eskema betetzen ez badu, `blocked_by_guard` itzultzen da.
+2. **Claude Code hook-a (`.claude/settings.json` + `.claude/hooks/block_secrets.py`)** — agenteak ezin ditu sekretuak beste bideetatik irakurri: `.env*` fitxategiak (`.env.example` izan ezik), gako pribatuak, `printenv`, `docker inspect`, `docker compose config`, etab. blokeatzen dira.
+
+MCP-k `API_PASSWORD` irakurtzen du eta tokena eskatzen dio API-ari, NiFi-k bezala. Mugak: sentsore-datuak eta alertak modelora **iristen dira** (MCP-ren helburua horixe da), eta hook-a ahalegin onenekoa da, ez bermea. Dokumentazio osoa: `README.md`, 13.5 atala.
