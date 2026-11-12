@@ -185,10 +185,10 @@ Eredua jada `models/cnc_failure_model.pkl`-en dago. Berria sortzeko:
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r scoring/requirements-dev.txt jupyter
-jupyter notebook notebooks/02_training_ML.ipynb
+jupyter notebook notebooks/02_training_ML.ipynb.ipynb
 ```
 
-Notebook-ak `models/cnc_failure_model.pkl` idazten du. Ondoren API-a berrabiarazi:
+Notebook-ak `models/cnc_failure_model.pkl` idazten du. Beste entrenamendu-esperimentuak `notebooks/lightgbm_Training.ipynb` eta `notebooks/Xgboots_Training.ipynb`-en daude. Notebook-aren dokumentazioa: `docs/ml_eredua_notebook_dokumentazioa.md`. Ondoren API-a berrabiarazi:
 
 ```bash
 docker compose restart scoring-api
@@ -321,7 +321,14 @@ cnc-guard/
 ├── telegram-notifier/        ← alerta berriak Telegram-era (notifier.py + Dockerfile)
 ├── mcp-server/               ← MCP zerbitzaria (cnc-guard) Claude Code / Codex-rentzat
 ├── notebooks/
-│   └── 02_training_ML.ipynb  ← eredua entrenatzeko notebook-a
+│   ├── 02_training_ML.ipynb.ipynb  ← eredua entrenatzeko notebook nagusia
+│   ├── lightgbm_Training.ipynb     ← LightGBM esperimentua
+│   └── Xgboots_Training.ipynb      ← XGBoost esperimentua
+├── docs/                     ← zerbitzu bakoitzaren dokumentazioa (+ media/ pantaila-argazkiak)
+│   ├── filebeat_dokumentazioa.md, kafka_dokumentazioa.md, nifi_dokumentazioa.md
+│   ├── kibana_dokumentazioa.md, streamlit_documentazioa.md
+│   └── ml_eredua_notebook_dokumentazioa.md
+├── kibana/export.ndjson      ← Kibana saved objects (dashboard-ak, bistaratzeak)
 ├── models/                   ← cnc_failure_model.pkl
 ├── data/
 │   └── ai4i2020_train.csv    ← entrenamendurako datuak
@@ -332,16 +339,20 @@ cnc-guard/
 └── .mcp.json, .codex/        ← MCP konfigurazioa
 ```
 
-## 11. Erronkaren dokumentua
+## 11. Dokumentazioa
+
+Zerbitzu bakoitzaren dokumentazio zehatza `docs/` karpetan dago: Filebeat, Kafka, NiFi, Kibana, Streamlit eta ML ereduaren notebook-a. Kibana-ko dashboard-ak inportatzeko: `kibana/export.ndjson` (Stack Management → Saved Objects → Import).
+
+## 12. Erronkaren dokumentua
 
 `ENUNTZIATUA.md` irakurri — hiru faseetan zer egin azaltzen du.
 
 
-## 12. MCP eta skills (Claude Code)
+## 13. MCP eta skills (Claude Code)
 
 CNC Guard Claude Code-rekin kontsultatu daiteke hizkuntza naturalean. Bi pieza daude: **MCP zerbitzaria** (datuak irakurtzeko tresnak) eta **skills** (Claude-k nola arrazoitu behar duen azaltzen duten jarraibideak).
 
-### 12.1 Instalazioa (behin bakarrik)
+### 13.1 Instalazioa (behin bakarrik)
 
 ```bash
 cd mcp-server && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
@@ -352,7 +363,7 @@ cd mcp-server && python3 -m venv .venv && .venv/bin/pip install -r requirements.
 2. Ireki Claude Code proiektuaren erroan (`T1-erronka1/`) eta onartu `cnc-guard` zerbitzaria (`.mcp.json`-ek definitzen du). Ez bada agertzen, berrabiarazi Claude Code / birkargatu VS Code leihoa eta ireki txat berri bat.
 3. Egiaztatu: `claude mcp list` → `cnc-guard ... ✔ Connected` (edo `/mcp` txatean, `project` taldean).
 
-### 12.2 MCP tresnak
+### 13.2 MCP tresnak
 
 Ez dira eskuz deitzen: Claude-ri galdetu eta berak aukeratzen du tresna egokia. Guztiak irakurketa/kalkulu soilekoak dira, ez dute ezer aldatzen.
 
@@ -365,7 +376,7 @@ Ez dira eskuz deitzen: Claude-ri galdetu eta berak aukeratzen du tresna egokia. 
 
 Alerta mailak: `OK` (≤ 0.15), `KONTUZ` (0.15–0.8), `LARRIA` (> 0.8).
 
-### 12.3 Skills
+### 13.3 Skills
 
 `.claude/skills/`-en daude eta Claude-k automatikoki aktibatzen ditu galderak bat datorrenean (ez da komandorik idatzi behar). Behartzeko: `/euskera-azterketa` edo `/pdf-media`.
 
@@ -378,7 +389,7 @@ Alerta mailak: `OK` (≤ 0.15), `KONTUZ` (0.15–0.8), `LARRIA` (> 0.8).
 
 `pdf-media`-k PDFko irudiak `docs/media/<pdf-izena>/` karpetan gordetzen ditu (`manifest.json`-ekin) eta Markdown dokumentuetan erreferentziatzen ditu bide erlatiboekin. Behar du: `poppler` (`pdfimages`, `pdftoppm`).
 
-### 12.4 Beste agenteak (Codex, Cursor...)
+### 13.4 Beste agenteak (Codex, Cursor...)
 
 Konfigurazioa ez da Claude Code-rentzat bakarrik:
 
@@ -391,7 +402,7 @@ Konfigurazioa ez da Claude Code-rentzat bakarrik:
 
 Beste MCP bezero batek: komandoa `mcp-server/.venv/bin/python mcp-server/server.py` (stdio), `API_URL` eta `ES_URL` ingurune-aldagaiekin.
 
-### 12.5 Segurtasun-arnesa (datu sentikorrak ez dira modelora iristen)
+### 13.5 Segurtasun-arnesa (datu sentikorrak ez dira modelora iristen)
 
 MCP tresnek eta agenteak irakurtzen duten guztia modeloaren testuinguruan sartzen da (eta hornitzailearen APIra joaten da). Hori mugatzeko bi geruza daude.
 
@@ -416,7 +427,7 @@ Mugak (garrantzitsua):
 - Codex-ek MCP geruza bera erabiltzen du (zerbitzari bera), baina `.claude/settings.json` ez da Codex-entzat: konfiguratu bere sandbox- eta onarpen-politika.
 - Elkarrizketan dagoeneko agertu den informazioa ezin da atzera bota.
 
-### 12.6 Arazoak
+### 13.6 Arazoak
 
 | Sintoma | Konponbidea |
 |---|---|
