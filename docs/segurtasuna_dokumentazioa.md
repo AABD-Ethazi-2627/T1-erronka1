@@ -1,102 +1,12 @@
+# CNC Guard — Segurtasuna eta araudiaren betetzea
 
-# CNC Guard - Hutsegiteen ereduaren entrenamendua
+Dokumentu honek CNC Guard-en segurtasun-neurriak (sekretuak, autentifikazioa, MCP arnesa) eta Europako araudiarekiko betetzea biltzen ditu: **AI Act** (2024/1689 Erregelamendua) eta **DBEO / RGPD** (2016/679 Erregelamendua).
 
-Random Forest bat entrenatzen dugu, CNC makina batek 6 sentsore irakurketatik aurrera huts egingo duen iragartzen duena. 0,15eko atalasearekin, balidazioko 54 akatsetatik 48 detektatzen ditu (recall 0,89), eta kalkulatutako kostua 55.800 €-tan uzten du; eredurik gabe, berriz, 270.000 €-tan.
+> Aldez aurretiko oharra: hau proiektuaren auto-ebaluazio teknikoa da, ez aholku juridikoa. Produkzioan jarri aurretik, erakundeko datuen babeserako ordezkariak (DPO) edo aholkulari juridikoak berretsi beharko luke.
 
+## 1. Sekretuen kudeaketa (`.env`)
 
-## Barne egitura
-```text
-T1-erronka1/
-├── 
-│   
-├── notebooks/
-│   ├── 02_training_ML.ipynb        # Modeloaren entrenamendua
-|   └── lightgbm_Training.ipynb     # Probatutako beste modeloa
-│   └── Xgboots_Training.ipynb      # Probatutako beste modeloa 
-├── models/
-│   ├── cnc_failure_model.pkl       # Model producction (pipeline sklearn osoa)
-│   └── backups/                    # Modeloaren aurreko bertsioak
-|
-├── scoring/                        # Prediction API  (FastAPI)
-│   ├── cnc_ml/                     # notebook eta API artean partekatutako ML-a
-│   │   ├── columns.py              # Datu-multzoen zutabe izenak
-│   │   ├── features.py             # Feature engineering. Hutsegite-mota bakoitzaren arrazoi fisikoan oinarrituta:
-│   │   └── pipeline.py             # sklearn Pipeline osoa: feature engineering + kodeketa + eredua.
-│   ├── app/
-
-
-```
-## Random Forest modeloa aukeratzeko justifikazioa
-
-Random Forest eredua aukeratu dugu, CNC makinen sentsoreetatik jasotako datuak aztertzeko eta hutsegiteekin lotutako patroiak identifikatzeko gai delako.
-
-Eredu honek erabaki-zuhaitz asko konbinatzen ditu, eta horri esker, hainbat aldagairen arteko erlazioak azter ditzake (tenperatura, bibrazioa...), guretzako hori oso garrantzitsua da mekinen hutsetigeK ez direlako beti aldagai bakar baten ondorioz izaten. Random Forest ereduak datu historikoetatik ikas dezake, baldin eta datu horiek behar bezala etiketatuta badaude. Horrela, aurretik gertatutako hutsegiteak eta funtzionamendu normaleko egoerak erabil ditzake ereduak egoera berriak sailkatzeko. Horrez gain, erlazio konplexuak ikasten ditu, hutsegiteak identifikatzeko, aldagaien arteko erlazio ez-linealak ikasi ditzake.
-
-## Zergatik erabili da 0.15 atalasea
-FAILURE_THRESHOLD = 0.15 hautatuko da, kostu ekonomiko txikiena duen atalasea baita.  Kostuen taula ofizialaren arabera, detektatu gabeko akats bat (5.000 €) alarma faltsu bat (200 €) baino 25 aldiz garestiagoa da. Horregatik, merezi du alarma faltsu gehiago onartzea, trukean matxura gehiago detektatzen badira. 0,15ekin 54 akatsetatik 48 detektatu genituen
-### Kostuen taula ofiziala
-Ereduaren emaitza bakoitzak batez besteko kostu bat du:
-| Casua | Gertaera | Kostea |
-|---|---|---:|
-| FN (false negative) |Makina produkzioan hausten da: 3 h × 1.200 €/h + premiazko konponketa eta piezak. | 5.000 € |
-| FP (false positive) | Makina geldirik dagoela, 45 minutuko alferrikako azterketa egitea. | 200 € |
-| TP (true positive) | Mantentze-lan prebentiboa: hautsi baino lehen aldatzen da pieza. | 300 € |
-| TN (true negatie) | Arazorik gabe funtzionatzen du | 0 € |
-
-### Atalaseen konparaketa
-0,15eko atalasea da kostu txikiena sortzen duena. 0,5eko atalasearekin alderatuta, 17.600 € aurrezten dira, eta 0,4ko atalasearekin alderatuta, berriz, 9.000 €. Baliozkotzea 1.600 makinaren erregistroekin egin da, benetako 54 hutsegite kontuan hartuta eta gure Random Forest eredua erabiliz.
-
-| Atalasea | Detektatutakoak (TP) | Detektatu gabekoak (FN) | Alarma faltsuak (FP) | Recall | Doitasuna (Precision) | Kostu osoa |
-|---|---:|---:|---:|---:|---:|---:|
-| 0,5 (lehenetsia) | 42 | 12 | 4 | 0,78 | 0,91 | 73.400 € |
-| 0,4 | 44 | 10 | 8 | 0,81 | 0,85 | 64.800 € |
-| 0,3 | 44 | 10 | 14 | 0,81 | 0,76 | 66.000 € |
-| 0,2 | 45 | 9 | 35 | 0,83 | 0,56 | 65.500 € |
-| **0,15 (aukeratua)** | **48** | **6** | **57** | **0,89** | **0,46** | **55.800 €** |
-| 0,1 | 49 | 5 | 93 | 0,91 | 0,35 | 58.300 € |
-
-Matxura bat gehiago detektatzeak 4.700 € aurrezten ditu (5.000 € matxuragatik, 300 € pieza aldatzeagatik), eta aurrezki horrek 23 bat alarma faltsu ordaintzen ditu. Atalasea jaisteak konpentsatu egiten du, matxura bakoitzak 23 alarma faltsu baino gutxiago balio duen bitartean.
-
-* **0,5etik 0,4ra:** 2 hutsegite gehiago detektatzen dira (+9.400 €), baina 4 alarma faltsu gehiago sortzen dira (−800 €). Beraz, aldaketa horrek merezi du.
-
-* **0,4tik 0,2ra:** ia ez da hobekuntzarik lortzen. Recall-a ia konstante mantentzen da (≈ 0,82), 0,22 eta 0,45 arteko atalaseetan. 27 alarma faltsu gehiago sortzen dira, baina hutsegite bakarra gehiago detektatzen da. Horregatik, 0,2 eta 0,3 atalaseek 0,4k baino kostu handiagoa dute.
-
-* **0,4tik 0,15era:** 4 hutsegite gehiago detektatzen dira (+18.800 €), baina 49 alarma faltsu gehiago sortzen dira (−9.800 €). Aldaketa horrek merezi du, guztira 9.000 € aurrezten direlako.
-
-* **0,15etik 0,1era:** hutsegite bat gehiago detektatzen da (+4.700 €), baina 36 alarma faltsu gehiago sortzen dira (−7.200 €). Kasu honetan, aldaketak ez du merezi, kostu osoa handitu egiten delako.
-
-Errore kopurua bakarrik kontuan hartuko bagenu, 0,4ko atalasea hobea dela pentsa genezake (18 errore, 63 errore baino gutxiago). Hala ere, errore guztiek ez dute kostu bera. Kostuak kontuan hartuta, 0,15eko atalasea merkeagoa da.
-
-### Zergatik 0,15 eta ez kostu txikieneko balio zehatza?
-
-Gure kalkuluetan, kosturik txikiena 0,16ko atalasean lortzen da (54.200 €). Hala ere, balio hori baliozkotze-datu zehatzetara gehiegi egokituta egon daiteke. 0,10 eta 0,16 arteko atalaseek antzeko kostuak dituzte (54.000–58.000 €). Horregatik, 0,15eko atalasea aukeratu dugu, aukera egokia eta zuhurra delako, balio zehatz bakar baten menpe egon gabe.
-
-## Zergatik ihes egiten duten 6 akatsek 0.15eko atalasearekin
-Ereduak bero-, potentzia- eta gainesfortzu-akats guztiak detektatzen ditu; ihes egiten diren 6 akatsetatik, 5 erremintaren higadurarenak dira (TWF).
-
-| Hutsegite mota | Hutsegiteak baliozkotzean | 0,4 atalasearekin detektatu gabeak | 0,15 atalasearekin detektatu gabeak |
-|---|---:|---:|---:|
-| Beroa (HDF) | 10 | 0 | 0 |
-| Potentzia (PWF) | 20 | 0 | 0 |
-| Gainesfortzua (OSF) | 19 | 0 | 0 |
-| Erremintaren higadura (TWF) | 11 | 9 | 5 |
-| Mota ezezaguna | 1 | 1 | 1 |
-
-Makina batzuek hainbat hutsegite mota izan ditzakete aldi berean; horregatik, hutsegiteen zutabeko baturak 54 baino gehiago ematen du.
-
-- **0,15eko atalasearen abantaila:** 0,4ko atalasearekin detektatu gabe geratzen ziren TWF motako 4 hutsegite berreskuratzen ditu. Ereduak 0,17 eta 0,23 arteko probabilitateak ematen dizkie.
-
-- **Zergatik ez diren gainerako TWF hutsegiteak detektatzen:** erreminta erabilerako 200 eta 240 minutu artean ausaz apurtzen da, eta higadura-maila bera duten makina osasuntsu asko daude. Sentsoreek ezin dituzte egoera horiek bereizi.
-
-- **Geratzen diren 6 hutsegiteak:** 0,00 eta 0,12 arteko probabilitateak dituzte. Horiek detektatzeko, ia makina guztiei alarma eman beharko litzaieke, eta horrek aurreztutakoa baino gehiago kostatuko luke.
-
-- **TWF motako hutsegiteetarako benetako irtenbidea:** mantentze-lan prebentiboak egitea eta erreminta erabilerako 200 minutu bete aurretik aldatzea.
-
-## Ereduaren erabilera segurua: `.env`, NiFi tokena eta MCP arnesa
-
-Eredua Scoring API-ren (FastAPI) bidez zerbitzatzen da. Hori guztia babesteko, sekretuak ez daude kodean ez eta `docker-compose.*.yml`-n: `.env` fitxategian daude (`.gitignore`-n dago, ez da git-era igotzen). Txantiloia `.env.example` da.
-
-### `.env` aldagaiak
+Sekretuak ez daude kodean ez eta `docker-compose.*.yml`-n: `.env` fitxategian daude (`.gitignore`-n dago, ez da git-era igotzen). Txantiloia `.env.example` da, balio errealik gabe.
 
 | Aldagaia | Zertarako |
 |---|---|
@@ -108,7 +18,7 @@ Eredua Scoring API-ren (FastAPI) bidez zerbitzatzen da. Hori guztia babesteko, s
 
 Pasahitzak eta `JWT_SECRET` derrigorrezkoak dira: falta badira, `docker compose` errorearekin gelditzen da.
 
-### NiFi → Scoring API autentifikazio-fluxua (API tokena)
+## 2. NiFi → Scoring API autentifikazioa (API tokena)
 
 `/predict` endpoint-a babestuta dago; NiFi-k tokena lortu behar du aurrena:
 
@@ -119,7 +29,7 @@ Pasahitzak eta `JWT_SECRET` derrigorrezkoak dira: falta badira, `docker compose`
 
 NiFi-k ez ditu pasahitzak flow-en JSON-ean esportatzen; horregatik, `nifi-flows/CNC_Guard_Streaming.json` inportatu ondoren, `API_PASSWORD` eskuz sartu behar da controller service-an. Xehetasunak: [`nifi_dokumentazioa.md`](nifi_dokumentazioa.md).
 
-### MCP zerbitzaria eta segurtasun-arnesa
+## 3. MCP zerbitzaria eta segurtasun-arnesa
 
 Eredua Claude Code-tik kontsultatzeko `cnc-guard` MCP zerbitzaria (irakurketa-soilik) dago: `model_health`, `list_active_alerts`, `get_machine_status` eta `predict_failure`. Datu sentikorrak modelora ez iristeko, bi geruzako arnesa jarri dugu:
 
@@ -131,4 +41,92 @@ Eredua Claude Code-tik kontsultatzeko `cnc-guard` MCP zerbitzaria (irakurketa-so
    - *Fail closed*: irteerak eskema betetzen ez badu, `blocked_by_guard` itzultzen da.
 2. **Claude Code hook-a (`.claude/settings.json` + `.claude/hooks/block_secrets.py`)** — agenteak ezin ditu sekretuak beste bideetatik irakurri: `.env*` fitxategiak (`.env.example` izan ezik), gako pribatuak, `printenv`, `docker inspect`, `docker compose config`, etab. blokeatzen dira.
 
-MCP-k `API_PASSWORD` irakurtzen du eta tokena eskatzen dio API-ari, NiFi-k bezala. Mugak: sentsore-datuak eta alertak modelora **iristen dira** (MCP-ren helburua horixe da), eta hook-a ahalegin onenekoa da, ez bermea. Dokumentazio osoa: `README.md`, 13.5 atala.
+Mugak:
+
+- Sentsore-datuak eta alertak modelora **iristen dira** (MCP-ren helburua horixe da).
+- Hook-a ahalegin onenekoa da, ez bermea.
+- Elkarrizketan dagoeneko agertu den informazioa ezin da atzera bota.
+
+Dokumentazio osoa: `README.md`, 13.5 atala.
+
+## 4. AI Act (2024/1689 Erregelamendua) betetzea
+
+### 4.1 Sailkapena
+
+CNC Guard-ek Random Forest eredu bat erabiltzen du CNC makinen hutsegiteak iragartzeko (mantentze prediktiboa). AI Act-eko definizioaren arabera, **AA sistema** da (2. artikulua), eta bere erabilera:
+
+| Galdera | Ebaluazioa |
+|---|---|
+| Debekatutako praktika al da (5. artikulua)? | **Ez.** Ez du manipulaziorik, puntuazio sozialik, biometriarik edo pertsonen emozioen inferentziarik egiten. |
+| Arrisku handiko sistema al da (6. artikulua, III. eranskina)? | **Ez dirudi.** III. eranskinak aipatzen dituen eremuetan (biometria, hezkuntza, enplegua, funtsezko zerbitzuak, legea betearaztea...) ez dago sartuta. Makinen mantentze-lanerako tresna da, ez pertsonen inguruko erabakietarako. |
+| Segurtasun-osagai al da (I. eranskina, makinen araudia)? | **Ez.** Ez du makina kontrolatzen ezta gelditzen ere: alerta bat jaulkitzen du, eta mantentze-teknikariak erabakitzen du. Makinaren segurtasun-funtziorik ez du betetzen. |
+| Gardentasun-betebeharrak (50. artikulua)? | **Ez dagozkio.** Ez da txat-bot-a, ez ditu eduki sintetikoak sortzen eta ez du pertsonen emozioak detektatzen. |
+
+Ondorioz, **arrisku minimoko** sistema gisa sailkatzen dugu: ez du konformitate-ebaluaziorik, CE markarik edo EBko datu-baseko erregistrorik behar.
+
+> Sailkapena aldatuko litzateke sistema segurtasun-funtzio batera lotuko balitz (adib. makina automatikoki gelditzea alertaren arabera) edo langileen errendimendua ebaluatzeko erabiliko balitz (III. eranskineko 4. puntua, enplegua). Kasu horretan, berriro aztertu beharko litzateke.
+
+### 4.2 Aplikatzen diren betebeharrak eta neurriak
+
+| Betebeharra | Nola betetzen dugun |
+|---|---|
+| **AA alfabetatzea (4. artikulua)** — sistema erabiltzen duten pertsonek nahikoa ezagutza izatea | Eredua, atalaseak eta mugak dokumentatuta daude ([`ml_eredua_notebook_dokumentazioa.md`](ml_eredua_notebook_dokumentazioa.md)): 0,15 atalasea, recall 0,89, alarma faltsuen kopurua eta detektatzen ez diren hutsegiteak (TWF). |
+| **Giza gainbegiratzea** (arrisku handiko sistemetan derrigorrezkoa, hemen praktika onena) | Sistemak ez du ekintzarik automatikoki egiten. Alertak (`KONTUZ` / `LARRIA`) pertsona batek erabakitzeko bakarrik dira; MCP tresnak irakurketa-soilekoak dira. |
+| **Gardentasuna eta azalgarritasuna** | Alerta-mailak argiak dira (OK ≤ 0,15, KONTUZ 0,15–0,8, LARRIA > 0,8) eta `scoring/app/services/model.py`-n daude. Erabilitako aldagaiak (sentsoreak eta haietatik eratorritakoak) dokumentatuta daude. |
+| **Datuen kalitatea eta alborapena** | Datu-leakage-a saihesten da: `failure_TWF/HDF/PWF/OSF/RNF` ez dira features gisa erabiltzen. Balidazioa datu-multzo bereizian egiten da (1.600 erregistro). Datuak makinenak dira, ez pertsonenak. |
+| **Zehaztasuna eta mugak jakinaraztea** | Dokumentazioak argi esaten du eredua ez dela perfektua: 54 hutsegitetik 6 ez dira detektatzen, eta 0 alertak ez du "arriskurik ez" esan nahi (datuak ez badira iristen, ere 0 alerta izango dira). |
+| **Segurtasun informatikoa (kiberseguritatea)** | Autentifikazioa JWT bidez, sekretuak `.env`-n, HTTPS Caddy-rekin (produkzioan) eta MCP arnesa (ikus 1–3 atalak). |
+| **Erregistroak eta trazabilitatea** | Iragarpen guztiak Elasticsearch-eko `cnc-predictions` indizean gordetzen dira denbora-markarekin; ereduaren aurreko bertsioak `models/backups/` karpetan daude. |
+
+### 4.3 Egiteko dagoena
+
+- Ereduaren aldaketen erregistro formala mantentzea (zein bertsio zein egunetan jarri zen produkzioan).
+- Erabiltzaileei (mantentze-teknikariak) AA alfabetatze-prestakuntza laburra ematea, ereduaren mugei buruz.
+- Ereduaren errendimendua aldizka berrikustea (datu berriekin *drift*-a detektatzeko).
+
+## 5. DBEO / RGPD (2016/679 Erregelamendua) betetzea
+
+### 5.1 Tratatzen diren datuak
+
+| Datu-mota | Datu pertsonala al da? | Oharra |
+|---|---|---|
+| Makinen sentsore-datuak (tenperatura, bibrazioa, potentzia, higadura...) | **Ez** | Makina bakoitzaren identifikatzailea (`CNC-039`) ekipo industrial bat da, ez pertsona bat. |
+| Iragarpenak eta alertak (`cnc-predictions`) | **Ez** | Makinen probabilitateak dira. |
+| NiFi, API eta Samba erabiltzaile-izenak, saio-tokenak | **Bai** (pertsona identifikagarriak izan daitezke) | Sistema administratzen duten pertsonen kredentzialak. |
+| Telegram `chat_id` (aukerakoa) | **Bai** | Alertak jasotzen dituen pertsona edo taldea identifikatzen du. |
+| IP helbideak eta zerbitzuen logak | **Bai** (IP helbideak datu pertsonaltzat hartzen dira) | Docker logetan eta Caddy-n azaltzen dira. |
+| Taldeko kideen izenak dokumentazioan | **Bai** | Proiektuaren egile gisa agertzen dira. |
+
+Ondorioa: sistemaren zati nagusia (sentsoreak eta iragarpenak) **ez da DBEO-ren eremuan sartzen**, baina bai erabiltzaileen eta administrazioaren datu txikiak.
+
+### 5.2 Printzipioak eta neurriak
+
+| Printzipioa / artikulua | Nola betetzen dugun |
+|---|---|
+| **Gutxieneko datuak (5.1.c)** | Ez da langileen daturik biltzen. Operadoreen izenik, txandarik edo errendimendu-daturik ez dago sentsore-fluxuan. |
+| **Helburuaren mugaketa (5.1.b)** | Datuak mantentze prediktiborako bakarrik erabiltzen dira. |
+| **Segurtasuna (32. artikulua)** | Autentifikazioa (JWT), sekretuen kudeaketa `.env`-n, HTTPS (Caddy), NiFi-rako sarbide-kredentzialak, eta MCP arnesa (pasahitzak, IPak eta posta-helbideak modelora ez bidaltzeko). |
+| **Diseinuz eta lehenespenez babesa (25. artikulua)** | MCP-k eremuen zerrenda zuria erabiltzen du; sarrera berriak lehenespenez blokeatuta daude (*fail closed*). Telegram aukerakoa da eta lehenespenez desgaituta dago (`TELEGRAM_BOT_TOKEN` hutsik). |
+| **Legezko oinarria (6. artikulua)** | Erakundearen interes legitimoa (6.1.f): ekipoen mantentze-lanak eta ekoizpen-jarraitutasuna. |
+| **Pertsonei buruzko erabaki automatizatuak (22. artikulua)** | Ez dago. Sistemak makinei buruz erabakitzen du, ez pertsonei buruz. |
+
+### 5.3 Hirugarrenak eta nazioarteko transferentziak
+
+| Zerbitzua | Zer jasotzen duen | Neurria |
+|---|---|---|
+| **Telegram** (aukerakoa) | Alerta-mezuak (makina eta maila) eta `chat_id` | Aukerakoa; alerta-mezuek ez dute datu pertsonalik izan behar. Telegram EBtik kanpo dago: erabiltzen bada, transferentzia kontuan hartu behar da (V. kapitulua). |
+| **Claude / Anthropic** (MCP bidez, garapenean) | MCP tresnen irteera (iragarpenak eta alertak) | `guard.py`-k datu sentikorrak ezkutatzen ditu eta hook-ak sekretuak irakurtzea blokeatzen du. Produkzioko datu pertsonalak ez dira bidaltzen. |
+
+### 5.4 Egiteko dagoena
+
+- **Atxikipen-epeak definitzea**: Elasticsearch-eko indizeen (`cnc-sensors`, `cnc-predictions`) eta logen gordetze-epea zehaztea eta ILM politikaren bidez automatizatzea (5.1.e). Ez dago oraindik zehaztuta.
+- **Tratamendu-jardueren erregistroa (30. artikulua)** osatzea, erakundeak eskatzen badu.
+- Datu pertsonalak daudela egiaztatzea benetako instalazioan (adib. operadoreen izenak makinen identifikatzaileetan sartzen badira, datu horiek DBEO-ren eremuan sartuko lirateke).
+- Telegram erabiltzen bada, hornitzailearekin transferentziak aztertzea (28. eta 44-49. artikuluak).
+
+## 6. Laburpena
+
+| Araudia | Egoera |
+|---|---|
+| AI Act | **Arrisku minimoa.** Giza gainbegiratzea, dokumentazioa eta kiberseguritatea bete dira; AA alfabetatzea eta bertsioen erregistroa hobetu daitezke. |
+| DBEO / RGPD | **Datu pertsonal gutxi.** Sentsore-datuak ez dira pertsonalak; kredentzialak, IPak eta Telegram `chat_id` babestuta daude. Atxikipen-epeak definitu behar dira. |

@@ -351,6 +351,7 @@ cnc-guard/
 | [`docs/kibana_dokumentazioa.md`](docs/kibana_dokumentazioa.md) | Kibana: dashboard-ak eta bistaratzeak (txosten teknikoa) |
 | [`docs/streamlit_documentazioa.md`](docs/streamlit_documentazioa.md) | Streamlit panela: monitorizazioa, alertak eta iragarpenak |
 | [`docs/ml_eredua_notebook_dokumentazioa.md`](docs/ml_eredua_notebook_dokumentazioa.md) | ML eredua: entrenamendu-notebook-aren dokumentazioa |
+| [`docs/segurtasuna_dokumentazioa.md`](docs/segurtasuna_dokumentazioa.md) | Segurtasuna: `.env`, API tokena, MCP arnesa eta AI Act / DBEO (RGPD) betetzea |
 
 Pantaila-argazkiak `docs/media/` karpetan daude. Kibana-ko dashboard-ak inportatzeko: `kibana/export.ndjson` (Stack Management → Saved Objects → Import).
 

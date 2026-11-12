@@ -1,15 +1,19 @@
-4. Credenciales de la API: el token se guarda en st.session_state, es decir, uno por sesión, y se pide uno nuevo para cada usuario. Con @st.cache_resource se compartiría uno solo.
-5. Reintentos y errores: las llamadas a Elasticsearch y a la API no tienen reintentos. Un fallo puntual lleva a un except Exception que oculta la causa y deja el Dashboard en "Sin datos". Distinguiría "Elasticsearch caído" de "índice vacío".
-6. Validación de entrada: machine_id acepta cualquier texto, incluido vacío. Y los rangos de los sensores están fijos en el código (280–330 K, etc.). Conviene que coincidan con el esquema de la API, o pedirlos al endpoint.
+# Streamlit panelaren hobekuntza-proposamenak
 
-Mantenibilidad
-7. Fichero único de 827 líneas, ~380 de CSS inline: lo separaría en styles.css, api.py, es.py y un módulo por página. Así se puede probar y se entiende mejor.
-8. Sin tests ni tipos en la parte de Streamlit: la lógica de datos (agrupaciones, filtros) es fácil de sacar a funciones puras y probar.
-9. Dockerfile: está en Python 3.10, que ya está cerca del fin de soporte. Cambiaría a 3.12, fijaría altair en requirements.txt porque ahora entra como dependencia transitiva, y ejecutaría el contenedor con un usuario no root.
+## Segurtasuna eta sendotasuna
 
-UX
-10. Actualización automática: ahora se refresca a mano con un botón. Para un panel de monitorización tiene más sentido st.fragment(run_every=10).
-11. Histórico de predicciones manuales: la página Predicciones no guarda ni muestra los resultados anteriores. Una tabla con las últimas consultas de la sesión sería útil.
-12. Mezcla de idiomas: los nombres internos y los niveles están en euskera (KONTUZ, LARRIA, iragarri) y la interfaz en castellano. Si es para la entrega, yo lo unificaría.
+4. **API kredentzialak:** tokena `st.session_state`-n gordetzen da, hau da, saio bakoitzeko bat, eta erabiltzaile bakoitzak token berri bat eskatzen du. `@st.cache_resource`-rekin bakarra partekatuko litzateke.
+5. **Berrintentuak eta akatsak:** Elasticsearch-erako eta API-rako deiek ez dute berrintentuik. Hutsegite puntual batek `except Exception` batera eramaten du, eta horrek arrazoia ezkutatzen du eta Dashboard-a "Daturik ez" egoeran uzten du. "Elasticsearch erorita" eta "indize hutsa" bereiziko nituzke.
+6. **Sarreraren balidazioa:** `machine_id`-k edozein testu onartzen du, hutsik ere bai. Gainera, sentsoreen tarteak kodean finkatuta daude (280–330 K, etab.). Komeni da API-ren eskemarekin bat etortzea, edo endpoint-ari eskatzea.
 
-Si quieres, empiezo por los puntos 1–3, que son los que afectan a lo que se ve. Dime también si el 7 (dividir el fichero) te interesa ahora o prefieres dejarlo para el final.
+## Mantentzea
+
+7. **Fitxategi bakarra, 827 lerrokoa, ~380 CSS txertatua:** `styles.css`, `api.py`, `eu.py` eta orri bakoitzeko modulu bat bereiziko nituzke. Horrela probatzeko eta ulertzeko errazagoa da.
+8. **Proba eta motarik gabe Streamlit zatian:** datuen logika (multzokatzeak, iragazkiak) erraza da funtzio puruetara ateratzea eta probatzea.
+9. **Dockerfile:** Python 3.10 erabiltzen du, euskarriaren amaieratik gertu dagoena. 3.12ra aldatuko nuke, `altair` `requirements.txt`-n finkatuko nuke (orain mendekotasun iragankor gisa sartzen da) eta edukiontzia root ez den erabiltzaile batekin exekutatuko nuke.
+
+## Erabilgarritasuna (UX)
+
+10. **Eguneratze automatikoa:** orain eskuz eguneratzen da botoi batekin. Monitorizazio-panel baterako, `st.fragment(run_every=10)` zentzuzkoagoa da.
+11. **Eskuzko iragarpenen historia:** Iragarpenak orriak ez ditu aurreko emaitzak gordetzen ez erakusten. Saioko azken kontsultekin taula bat erabilgarria litzateke.
+12. **Hizkuntzen nahasketa:** barne-izenak eta mailak euskaraz daude (KONTUZ, LARRIA, iragarri) eta interfazea gaztelaniaz. Proiektu osoa euskaraz egon behar denez, interfazea euskaraz bateratu behar da.
