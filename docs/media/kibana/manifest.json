@@ -1,0 +1,168 @@
+{
+  "source": "Sistemak eta Big Data: Txosten Tekniko Osoa.pdf",
+  "slug": "kibana",
+  "pages": 14,
+  "images_count": 16,
+  "images": [
+    {
+      "file": "kibana-p01-01.png",
+      "page": 1,
+      "num": 1,
+      "kind": "image",
+      "width": 1024,
+      "height": 682,
+      "size_bytes": 1076897,
+      "description": "Azala: Sistemak eta Big Data Txosten Tekniko Osoa"
+    },
+    {
+      "file": "kibana-p03-01.png",
+      "page": 3,
+      "num": 1,
+      "kind": "image",
+      "width": 2000,
+      "height": 990,
+      "size_bytes": 3032241,
+      "description": "Datu-Arkitektura eta Big Data integrazioa"
+    },
+    {
+      "file": "kibana-p05-01.png",
+      "page": 5,
+      "num": 1,
+      "kind": "image",
+      "width": 1536,
+      "height": 1024,
+      "size_bytes": 1370797,
+      "description": "Ingest Pipeline automatizatuaren fluxua (Filebeat, Kafka, NiFi, ES)"
+    },
+    {
+      "file": "kibana-p07-01.png",
+      "page": 7,
+      "num": 1,
+      "kind": "image",
+      "width": 1906,
+      "height": 686,
+      "size_bytes": 151909,
+      "description": "Dashboard 1: Aginte-koadro orokorraren bistaratzea"
+    },
+    {
+      "file": "kibana-p08-01.png",
+      "page": 8,
+      "num": 1,
+      "kind": "image",
+      "width": 1175,
+      "height": 548,
+      "size_bytes": 53532,
+      "description": "Tenperaturaren bilakaera denboran zehar (Lens Line Chart)"
+    },
+    {
+      "file": "kibana-p08-02.png",
+      "page": 8,
+      "num": 2,
+      "kind": "image",
+      "width": 1165,
+      "height": 540,
+      "size_bytes": 28551,
+      "description": "Heatmap: Tresna-higadura vs Hutsegite-maiztasuna (Lens Heatmap)"
+    },
+    {
+      "file": "kibana-p09-01.png",
+      "page": 9,
+      "num": 1,
+      "kind": "image",
+      "width": 1173,
+      "height": 547,
+      "size_bytes": 60408,
+      "description": "Azken 50 gertaeren laburpena (Lens Data Table)"
+    },
+    {
+      "file": "kibana-p09-02.png",
+      "page": 9,
+      "num": 2,
+      "kind": "image",
+      "width": 471,
+      "height": 135,
+      "size_bytes": 5546,
+      "description": "KPI txartela: Makina aktiboen kopurua (50)"
+    },
+    {
+      "file": "kibana-p09-03.png",
+      "page": 9,
+      "num": 3,
+      "kind": "image",
+      "width": 468,
+      "height": 135,
+      "size_bytes": 6082,
+      "description": "KPI txartela: Hutsegite-tasa orokorra (%3.9 / 0.04)"
+    },
+    {
+      "file": "kibana-p10-01.png",
+      "page": 10,
+      "num": 1,
+      "kind": "image",
+      "width": 439,
+      "height": 452,
+      "size_bytes": 13134,
+      "description": "Hutsegite-probabilitate maximoa une honetan (Lens Gauge Vertical)"
+    },
+    {
+      "file": "kibana-p10-02.png",
+      "page": 10,
+      "num": 2,
+      "kind": "image",
+      "width": 1164,
+      "height": 375,
+      "size_bytes": 38347,
+      "description": "LARRIA mailako alertak azken orduan (Lens Data Table)"
+    },
+    {
+      "file": "kibana-p11-01.png",
+      "page": 11,
+      "num": 1,
+      "kind": "image",
+      "width": 580,
+      "height": 547,
+      "size_bytes": 27269,
+      "description": "Alerta mailen banaketa (Lens Donut)"
+    },
+    {
+      "file": "kibana-p11-02.png",
+      "page": 11,
+      "num": 2,
+      "kind": "image",
+      "width": 255,
+      "height": 260,
+      "size_bytes": 2921,
+      "description": "KPI txartela: LARRIA alerten kopurua (29)"
+    },
+    {
+      "file": "kibana-p12-01.png",
+      "page": 12,
+      "num": 1,
+      "kind": "image",
+      "width": 1176,
+      "height": 538,
+      "size_bytes": 143271,
+      "description": "Hutsegite-probabilitatearen bilakaera makina bakoitzeko (Lens Line Chart)"
+    },
+    {
+      "file": "kibana-p12-02.png",
+      "page": 12,
+      "num": 2,
+      "kind": "image",
+      "width": 1919,
+      "height": 775,
+      "size_bytes": 117908,
+      "description": "Discover interfazea: Sentsoreen telemetria eta alertak KQL bidez"
+    },
+    {
+      "file": "kibana-p13-01.png",
+      "page": 13,
+      "num": 1,
+      "kind": "image",
+      "width": 956,
+      "height": 775,
+      "size_bytes": 40149,
+      "description": "Discover: Dokumentu hedatua (JSON egitura zehatza)"
+    }
+  ]
+}

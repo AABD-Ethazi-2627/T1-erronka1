@@ -1,0 +1,15 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+__init__.py
+
+.vscode/
+models/backups/
+*.pkl.tmp
+.venv/
+.pytest_cache/
+data/stream/*.csv
+.claude/settings.local.json
